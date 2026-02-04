@@ -1,8 +1,6 @@
 module github.com/pterodactyl/wings
 
-go 1.24.0
-
-toolchain go1.24.1
+go 1.25.6
 
 require (
 	emperror.dev/errors v0.8.1

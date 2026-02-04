@@ -35,7 +35,10 @@ func NewFs() (*Filesystem, *rootFs) {
 
 	rfs.reset()
 
-	fs := New(filepath.Join(tmpDir, "/server"), 0, []string{})
+	fs, err := New(filepath.Join(tmpDir, "/server"), 0, []string{})
+	if err != nil {
+		panic(err)
+	}
 	fs.isTest = true
 
 	return fs, &rfs

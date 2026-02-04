@@ -2,6 +2,7 @@ package filesystem
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -16,7 +17,6 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/karrick/godirwalk"
 	ignore "github.com/sabhiram/go-gitignore"
 
 	"github.com/pterodactyl/wings/config"
@@ -35,35 +35,40 @@ type Filesystem struct {
 	diskLimit int64
 
 	// The root data directory path for this Filesystem instance.
-	root string
+	root     *os.Root
+	rootPath string
 
 	isTest bool
 }
 
 // New creates a new Filesystem instance for a given server.
-func New(root string, size int64, denylist []string) *Filesystem {
-	return &Filesystem{
-		root:              root,
+func New(path string, size int64, denylist []string) (*Filesystem, error) {
+	r, err := os.OpenRoot(path)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	fs := &Filesystem{
+		root:              r,
+		rootPath:          path,
 		diskLimit:         size,
 		diskCheckInterval: time.Duration(config.Get().System.DiskCheckInterval),
 		lastLookupTime:    &usageLookupTime{},
 		lookupInProgress:  system.NewAtomicBool(false),
 		denylist:          ignore.CompileIgnoreLines(denylist...),
 	}
+
+	return fs, nil
 }
 
 // Path returns the root path for the Filesystem instance.
 func (fs *Filesystem) Path() string {
-	return fs.root
+	return fs.rootPath
 }
 
 // File returns a reader for a file instance as well as the stat information.
 func (fs *Filesystem) File(p string) (*os.File, Stat, error) {
-	cleaned, err := fs.SafePath(p)
-	if err != nil {
-		return nil, Stat{}, errors.WithStackIf(err)
-	}
-	st, err := fs.Stat(cleaned)
+	st, err := fs.Stat(p)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, Stat{}, newFilesystemError(ErrNotExist, err)
@@ -73,7 +78,7 @@ func (fs *Filesystem) File(p string) (*os.File, Stat, error) {
 	if st.IsDir() {
 		return nil, Stat{}, newFilesystemError(ErrCodeIsDirectory, nil)
 	}
-	f, err := os.Open(cleaned)
+	f, err := fs.root.Open(p)
 	if err != nil {
 		return nil, Stat{}, errors.WithStackIf(err)
 	}
@@ -84,11 +89,7 @@ func (fs *Filesystem) File(p string) (*os.File, Stat, error) {
 // already. If  it is present, the file is opened using the defaults which will truncate
 // the contents. The opened file is then returned to the caller.
 func (fs *Filesystem) Touch(p string, flag int) (*os.File, error) {
-	cleaned, err := fs.SafePath(p)
-	if err != nil {
-		return nil, err
-	}
-	f, err := os.OpenFile(cleaned, flag, 0o644)
+	f, err := fs.root.OpenFile(p, flag, 0o644)
 	if err == nil {
 		return f, nil
 	}
@@ -100,24 +101,24 @@ func (fs *Filesystem) Touch(p string, flag int) (*os.File, error) {
 		return nil, errors.Wrap(err, "server/filesystem: touch: failed to open file handle")
 	}
 	// Only create and chown the directory if it doesn't exist.
-	if _, err := os.Stat(filepath.Dir(cleaned)); errors.Is(err, os.ErrNotExist) {
+	if _, err := fs.root.Stat(filepath.Dir(p)); errors.Is(err, os.ErrNotExist) {
 		// Create the path leading up to the file we're trying to create, setting the final perms
 		// on it as we go.
-		if err := os.MkdirAll(filepath.Dir(cleaned), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			return nil, errors.Wrap(err, "server/filesystem: touch: failed to create directory tree")
 		}
-		if err := fs.Chown(filepath.Dir(cleaned)); err != nil {
+		if err := fs.Chown(filepath.Dir(p)); err != nil {
 			return nil, err
 		}
 	}
-	o := &fileOpener{}
+	o := &fileOpener{root: fs.root}
 	// Try to open the file now that we have created the pathing necessary for it, and then
 	// Chown that file so that the permissions don't mess with things.
-	f, err = o.open(cleaned, flag, 0o644)
+	f, err = o.open(p, flag, 0o644)
 	if err != nil {
 		return nil, errors.Wrap(err, "server/filesystem: touch: failed to open file with wait")
 	}
-	_ = fs.Chown(cleaned)
+	_ = fs.Chown(p)
 	return f, nil
 }
 
@@ -125,20 +126,16 @@ func (fs *Filesystem) Touch(p string, flag int) (*os.File, error) {
 // will be created. This will also properly recalculate the disk space used by
 // the server when writing new files or modifying existing ones.
 func (fs *Filesystem) Writefile(p string, r io.Reader) error {
-	cleaned, err := fs.SafePath(p)
-	if err != nil {
-		return err
-	}
-
 	var currentSize int64
 	// If the file does not exist on the system already go ahead and create the pathway
 	// to it and an empty file. We'll then write to it later on after this completes.
-	stat, err := os.Stat(cleaned)
+	fmt.Println(p)
+	stat, err := fs.root.Stat(p)
 	if err != nil && !os.IsNotExist(err) {
 		return errors.Wrap(err, "server/filesystem: writefile: failed to stat file")
 	} else if err == nil {
 		if stat.IsDir() {
-			return errors.WithStack(&Error{code: ErrCodeIsDirectory, resolved: cleaned})
+			return errors.WithStack(&Error{code: ErrCodeIsDirectory, resolved: stat.Name()})
 		}
 		currentSize = stat.Size()
 	}
@@ -153,7 +150,7 @@ func (fs *Filesystem) Writefile(p string, r io.Reader) error {
 
 	// Touch the file and return the handle to it at this point. This will create the file,
 	// any necessary directories, and set the proper owner of the file.
-	file, err := fs.Touch(cleaned, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
+	file, err := fs.Touch(p, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
 	if err != nil {
 		return err
 	}
@@ -165,7 +162,7 @@ func (fs *Filesystem) Writefile(p string, r io.Reader) error {
 	// Adjust the disk usage to account for the old size and the new size of the file.
 	fs.addDisk(sz - currentSize)
 
-	return fs.unsafeChown(cleaned)
+	return fs.unsafeChown(p)
 }
 
 // Creates a new directory (name) at a specified path (p) for the server.
@@ -214,78 +211,6 @@ func (fs *Filesystem) Rename(from string, to string) error {
 	return nil
 }
 
-// Recursively iterates over a file or directory and sets the permissions on all of the
-// underlying files. Iterate over all of the files and directories. If it is a file just
-// go ahead and perform the chown operation. Otherwise dig deeper into the directory until
-// we've run out of directories to dig into.
-func (fs *Filesystem) Chown(path string) error {
-	cleaned, err := fs.SafePath(path)
-	if err != nil {
-		return err
-	}
-	return fs.unsafeChown(cleaned)
-}
-
-// unsafeChown chowns the given path, without checking if the path is safe. This should only be used
-// when the path has already been checked.
-func (fs *Filesystem) unsafeChown(path string) error {
-	if fs.isTest {
-		return nil
-	}
-
-	uid := config.Get().System.User.Uid
-	gid := config.Get().System.User.Gid
-
-	// Start by just chowning the initial path that we received.
-	if err := os.Chown(path, uid, gid); err != nil {
-		return errors.Wrap(err, "server/filesystem: chown: failed to chown path")
-	}
-
-	// If this is not a directory we can now return from the function, there is nothing
-	// left that we need to do.
-	if st, err := os.Stat(path); err != nil || !st.IsDir() {
-		return nil
-	}
-
-	// If this was a directory, begin walking over its contents recursively and ensure that all
-	// of the subfiles and directories get their permissions updated as well.
-	err := godirwalk.Walk(path, &godirwalk.Options{
-		Unsorted: true,
-		Callback: func(p string, e *godirwalk.Dirent) error {
-			// Do not attempt to chown a symlink. Go's os.Chown function will affect the symlink
-			// so if it points to a location outside the data directory the user would be able to
-			// (un)intentionally modify that files permissions.
-			if e.IsSymlink() {
-				if e.IsDir() {
-					return godirwalk.SkipThis
-				}
-
-				return nil
-			}
-
-			return os.Chown(p, uid, gid)
-		},
-	})
-	return errors.Wrap(err, "server/filesystem: chown: failed to chown during walk function")
-}
-
-func (fs *Filesystem) Chmod(path string, mode os.FileMode) error {
-	cleaned, err := fs.SafePath(path)
-	if err != nil {
-		return err
-	}
-
-	if fs.isTest {
-		return nil
-	}
-
-	if err := os.Chmod(cleaned, mode); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // Begin looping up to 50 times to try and create a unique copy file name. This will take
 // an input of "file.txt" and generate "file copy.txt". If that name is already taken, it will
 // then try to write "file copy 2.txt" and so on, until reaching 50 loops. At that point we
@@ -325,12 +250,7 @@ func (fs *Filesystem) findCopySuffix(dir string, name string, extension string) 
 // Copies a given file to the same location and appends a suffix to the file to indicate that
 // it has been copied.
 func (fs *Filesystem) Copy(p string) error {
-	cleaned, err := fs.SafePath(p)
-	if err != nil {
-		return err
-	}
-
-	s, err := os.Stat(cleaned)
+	s, err := fs.root.Stat(p)
 	if err != nil {
 		return err
 	} else if s.IsDir() || !s.Mode().IsRegular() {
@@ -344,8 +264,8 @@ func (fs *Filesystem) Copy(p string) error {
 		return err
 	}
 
-	base := filepath.Base(cleaned)
-	relative := strings.TrimSuffix(strings.TrimPrefix(cleaned, fs.Path()), base)
+	base := filepath.Base(p)
+	relative := strings.TrimSuffix(strings.TrimPrefix(p, fs.Path()), base)
 	extension := filepath.Ext(base)
 	name := strings.TrimSuffix(base, extension)
 
@@ -357,7 +277,7 @@ func (fs *Filesystem) Copy(p string) error {
 		name = strings.TrimSuffix(name, ".tar")
 	}
 
-	source, err := os.Open(cleaned)
+	source, err := fs.root.Open(p)
 	if err != nil {
 		return err
 	}
@@ -374,10 +294,10 @@ func (fs *Filesystem) Copy(p string) error {
 // TruncateRootDirectory removes _all_ files and directories from a server's
 // data directory and resets the used disk space to zero.
 func (fs *Filesystem) TruncateRootDirectory() error {
-	if err := os.RemoveAll(fs.Path()); err != nil {
+	if err := fs.root.RemoveAll("/"); err != nil {
 		return err
 	}
-	if err := os.Mkdir(fs.Path(), 0o755); err != nil {
+	if err := fs.root.Mkdir("/", 0o755); err != nil {
 		return err
 	}
 	atomic.StoreInt64(&fs.diskUsed, 0)
@@ -406,7 +326,7 @@ func (fs *Filesystem) Delete(p string) error {
 		return errors.New("cannot delete root server directory")
 	}
 
-	st, err := os.Lstat(resolved)
+	st, err := fs.root.Lstat(resolved)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			fs.error(err).Warn("error while attempting to stat file before deletion")
@@ -466,11 +386,12 @@ func (fs *Filesystem) Delete(p string) error {
 		fs.addDisk(-st.Size())
 	}
 
-	return os.RemoveAll(resolved)
+	return fs.root.RemoveAll(resolved)
 }
 
 type fileOpener struct {
 	busy uint
+	root *os.Root
 }
 
 // Attempts to open a given file up to "attempts" number of times, using a backoff. If the file
@@ -478,7 +399,7 @@ type fileOpener struct {
 // has been exhaused, at which point we will abort with an error.
 func (fo *fileOpener) open(path string, flags int, perm os.FileMode) (*os.File, error) {
 	for {
-		f, err := os.OpenFile(path, flags, perm)
+		f, err := fo.root.OpenFile(path, flags, perm)
 
 		// If there is an error because the text file is busy, go ahead and sleep for a few
 		// hundred milliseconds and then try again up to three times before just returning the
@@ -570,21 +491,4 @@ func (fs *Filesystem) ListDirectory(p string) ([]Stat, error) {
 	})
 
 	return out, nil
-}
-
-func (fs *Filesystem) Chtimes(path string, atime, mtime time.Time) error {
-	cleaned, err := fs.SafePath(path)
-	if err != nil {
-		return err
-	}
-
-	if fs.isTest {
-		return nil
-	}
-
-	if err := os.Chtimes(cleaned, atime, mtime); err != nil {
-		return err
-	}
-
-	return nil
 }

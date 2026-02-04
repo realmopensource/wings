@@ -44,15 +44,7 @@ func (s *Stat) MarshalJSON() ([]byte, error) {
 // Stat stats a file or folder and returns the base stat object from go along
 // with the MIME data that can be used for editing files.
 func (fs *Filesystem) Stat(p string) (Stat, error) {
-	cleaned, err := fs.SafePath(p)
-	if err != nil {
-		return Stat{}, err
-	}
-	return fs.unsafeStat(cleaned)
-}
-
-func (fs *Filesystem) unsafeStat(p string) (Stat, error) {
-	s, err := os.Stat(p)
+	s, err := fs.root.Stat(p)
 	if err != nil {
 		return Stat{}, err
 	}
