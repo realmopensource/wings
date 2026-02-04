@@ -165,11 +165,14 @@ func (fs *Filesystem) DirectorySize(dir string) (int64, error) {
 
 	var size int64
 	var st syscall.Stat_t
-	var hardLinks []uint64
 
 	err = godirwalk.Walk(d, &godirwalk.Options{
 		Unsorted: true,
 		Callback: func(p string, e *godirwalk.Dirent) error {
+			if !e.ModeType().IsRegular() {
+				return nil
+			}
+
 			// If this is a symlink then resolve the final destination of it before trying to continue walking
 			// over its contents. If it resolves outside the server data directory just skip everything else for
 			// it. Otherwise, allow it to continue.
@@ -188,18 +191,8 @@ func (fs *Filesystem) DirectorySize(dir string) (int64, error) {
 				atomic.AddInt64(&size, st.Size)
 			}
 
-			var sysFileInfo = info.Sys().(*unix.Stat_t)
-			if sysFileInfo.Nlink > 1 {
-				// Hard links have the same inode number
-				if slices.Contains(hardLinks, sysFileInfo.Ino) {
-					// Don't add hard links size twice
-					return nil
-				} else {
-					hardLinks = append(hardLinks, sysFileInfo.Ino)
-				}
-			}
+			// todo: don't count hardlinks twice
 
-			size.Add(info.Size())
 			return nil
 		},
 	})

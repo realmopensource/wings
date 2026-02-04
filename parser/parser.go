@@ -2,7 +2,6 @@ package parser
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"io"
 	"os"
@@ -431,18 +430,8 @@ func (f *ConfigurationFile) parseJsonFile(path string) error {
 		return err
 	}
 
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
-	if err := file.Truncate(0); err != nil {
-		return err
-	}
-
-	// Write the data to the file.
-	if _, err := io.Copy(file, bytes.NewReader(data.BytesIndent("", "    "))); err != nil {
-		return errors.Wrap(err, "parser: failed to write properties file to disk")
-	}
-	return nil
+	output := []byte(data.StringIndent("", "    "))
+	return os.WriteFile(path, output, 0o644)
 }
 
 // Parses a yaml file and updates any matching key/value pairs before persisting
@@ -479,56 +468,35 @@ func (f *ConfigurationFile) parseYamlFile(path string) error {
 		return err
 	}
 
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
-	if err := file.Truncate(0); err != nil {
-		return err
-	}
-
-	// Write the data to the file.
-	if _, err := io.Copy(file, bytes.NewReader(marshaled)); err != nil {
-		return errors.Wrap(err, "parser: failed to write properties file to disk")
-	}
-	return nil
+	return os.WriteFile(path, marshaled, 0o644)
 }
 
 // Parses a text file using basic find and replace. This is a highly inefficient method of
 // scanning a file and performing a replacement. You should attempt to use anything other
 // than this function where possible.
-func (f *ConfigurationFile) parseTextFile(file ufs.File) error {
-	b := bytes.NewBuffer(nil)
-	s := bufio.NewScanner(file)
-	var replaced bool
-	for s.Scan() {
-		line := s.Bytes()
-		replaced = false
+func (f *ConfigurationFile) parseTextFile(path string) error {
+	input, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(input), "\n")
+	for i, line := range lines {
 		for _, replace := range f.Replace {
 			// If this line doesn't match what we expect for the replacement, move on to the next
 			// line. Otherwise, update the line to have the replacement value.
-			if !bytes.HasPrefix(line, []byte(replace.Match)) {
+			if !strings.HasPrefix(line, replace.Match) {
 				continue
 			}
-			b.Write(replace.ReplaceWith.Bytes())
-			replaced = true
+
+			lines[i] = replace.ReplaceWith.String()
 		}
-		if !replaced {
-			b.Write(line)
-		}
-		b.WriteByte('\n')
 	}
 
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
-	if err := file.Truncate(0); err != nil {
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
 		return err
 	}
 
-	// Write the data to the file.
-	if _, err := io.Copy(file, b); err != nil {
-		return errors.Wrap(err, "parser: failed to write properties file to disk")
-	}
 	return nil
 }
 
@@ -558,29 +526,31 @@ func (f *ConfigurationFile) parseTextFile(file ufs.File) error {
 //
 // @see https://github.com/pterodactyl/panel/issues/2308 (original)
 // @see https://github.com/pterodactyl/panel/issues/3009 ("bug" introduced as result)
-func (f *ConfigurationFile) parsePropertiesFile(file ufs.File) error {
-	b, err := io.ReadAll(file)
-	if err != nil {
-		return err
-	}
-
-	s := bytes.NewBuffer(nil)
-	scanner := bufio.NewScanner(bytes.NewReader(b))
-	// Scan until we hit a line that is not a comment that actually has content
-	// on it. Keep appending the comments until that time.
-	for scanner.Scan() {
-		text := scanner.Bytes()
-		if len(text) > 0 && text[0] != '#' {
-			break
+func (f *ConfigurationFile) parsePropertiesFile(path string) error {
+	var s strings.Builder
+	// Open the file and attempt to load any comments that currenty exist at the start
+	// of the file. This is kind of a hack, but should work for a majority of users for
+	// the time being.
+	if fd, err := os.Open(path); err != nil {
+		return errors.Wrap(err, "parser: could not open file for reading")
+	} else {
+		scanner := bufio.NewScanner(fd)
+		// Scan until we hit a line that is not a comment that actually has content
+		// on it. Keep appending the comments until that time.
+		for scanner.Scan() {
+			text := scanner.Text()
+			if len(text) > 0 && text[0] != '#' {
+				break
+			}
+			s.WriteString(text + "\n")
 		}
-		s.Write(text)
-		s.WriteByte('\n')
-	}
-	if err := scanner.Err(); err != nil {
-		return errors.WithStackIf(err)
+		_ = fd.Close()
+		if err := scanner.Err(); err != nil {
+			return errors.WithStackIf(err)
+		}
 	}
 
-	p, err := properties.Load(b, properties.UTF8)
+	p, err := properties.LoadFile(path, properties.UTF8)
 	if err != nil {
 		return errors.Wrap(err, "parser: could not load properties file for configuration update")
 	}
@@ -618,16 +588,17 @@ func (f *ConfigurationFile) parsePropertiesFile(file ufs.File) error {
 		s.WriteString(key + "=" + strings.Trim(strconv.QuoteToASCII(value), "\"") + "\n")
 	}
 
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
+	// Open the file for writing.
+	w, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
 		return err
 	}
-	if err := file.Truncate(0); err != nil {
-		return err
-	}
+	defer w.Close()
 
 	// Write the data to the file.
-	if _, err := io.Copy(file, s); err != nil {
+	if _, err := w.Write([]byte(s.String())); err != nil {
 		return errors.Wrap(err, "parser: failed to write properties file to disk")
 	}
+
 	return nil
 }
