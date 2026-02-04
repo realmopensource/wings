@@ -56,8 +56,6 @@ func getDownloadBackup(c *gin.Context) {
 		return
 	}
 
-	// The use of `os` here is safe as backups are not stored within server
-	// accessible directories.
 	f, err := os.Open(b.Path())
 	if err != nil {
 		middleware.CaptureAndAbort(c, err)
@@ -89,18 +87,26 @@ func getDownloadFile(c *gin.Context) {
 		return
 	}
 
-	f, st, err := s.Filesystem().File(token.FilePath)
+	p, _ := s.Filesystem().SafePath(token.FilePath)
+	st, err := os.Stat(p)
+	// If there is an error or we're somehow trying to download a directory, just
+	// respond with the appropriate error.
 	if err != nil {
 		middleware.CaptureAndAbort(c, err)
 		return
-	}
-	defer f.Close()
-	if st.IsDir() {
+	} else if st.IsDir() {
 		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
 			"error": "The requested resource was not found on this server.",
 		})
 		return
 	}
+
+	f, err := os.Open(p)
+	if err != nil {
+		middleware.CaptureAndAbort(c, err)
+		return
+	}
+	defer f.Close()
 
 	c.Header("Content-Length", strconv.Itoa(int(st.Size())))
 	c.Header("Content-Disposition", "attachment; filename="+strconv.Quote(st.Name()))

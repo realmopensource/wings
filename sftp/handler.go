@@ -2,6 +2,7 @@ package sftp
 
 import (
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -121,7 +122,7 @@ func (h *Handler) Filewrite(request *sftp.Request) (io.WriterAt, error) {
 	if !h.can(permission) {
 		return nil, sftp.ErrSSHFxPermissionDenied
 	}
-	f, err := h.fs.Touch(request.Filepath, os.O_RDWR|os.O_TRUNC)
+	f, err := h.fs.Touch(request.Filepath, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
 	if err != nil {
 		l.WithField("flags", request.Flags).WithField("error", err).Error("failed to open existing file on system")
 		return nil, sftp.ErrSSHFxFailure
@@ -219,8 +220,16 @@ func (h *Handler) Filecmd(request *sftp.Request) error {
 		if !h.can(PermissionFileCreate) {
 			return sftp.ErrSSHFxPermissionDenied
 		}
-		if err := h.fs.Symlink(request.Filepath, request.Target); err != nil {
-			l.WithField("target", request.Target).WithField("error", err).Error("failed to create symlink")
+		source, err := h.fs.SafePath(request.Filepath)
+		if err != nil {
+			return sftp.ErrSSHFxNoSuchFile
+		}
+		target, err := h.fs.SafePath(request.Target)
+		if err != nil {
+			return sftp.ErrSSHFxNoSuchFile
+		}
+		if err := os.Symlink(source, target); err != nil {
+			l.WithField("target", target).WithField("error", err).Error("failed to create symlink")
 			return sftp.ErrSSHFxFailure
 		}
 		break
@@ -265,12 +274,16 @@ func (h *Handler) Filelist(request *sftp.Request) (sftp.ListerAt, error) {
 
 	switch request.Method {
 	case "List":
-		entries, err := h.fs.ReadDirStat(request.Filepath)
+		p, err := h.fs.SafePath(request.Filepath)
+		if err != nil {
+			return nil, sftp.ErrSSHFxNoSuchFile
+		}
+		files, err := ioutil.ReadDir(p)
 		if err != nil {
 			h.logger.WithField("source", request.Filepath).WithField("error", err).Error("error while listing directory")
 			return nil, sftp.ErrSSHFxFailure
 		}
-		return ListerAt(entries), nil
+		return ListerAt(files), nil
 	case "Stat":
 		st, err := h.fs.Stat(request.Filepath)
 		if err != nil {

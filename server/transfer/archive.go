@@ -35,8 +35,8 @@ type Archive struct {
 func NewArchive(t *Transfer, size uint64) *Archive {
 	return &Archive{
 		archive: &filesystem.Archive{
-			Filesystem: t.Server.Filesystem(),
-			Progress:   progress.NewProgress(size),
+			BasePath: t.Server.Filesystem().Path(),
+			Progress: progress.NewProgress(size),
 		},
 	}
 }

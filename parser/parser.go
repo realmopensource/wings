@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -18,7 +20,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/pterodactyl/wings/config"
-	"github.com/pterodactyl/wings/internal/ufs"
 )
 
 // The file parsing options that are available for a server configuration file.
@@ -188,12 +189,11 @@ func (cfr *ConfigurationFileReplacement) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Parse parses a given configuration file and updates all the values within
-// as defined in the API response from the Panel.
-func (f *ConfigurationFile) Parse(file ufs.File) error {
-	// log.WithField("path", path).WithField("parser", f.Parser.String()).Debug("parsing server configuration file")
+// Parses a given configuration file and updates all of the values within as defined
+// in the API response from the Panel.
+func (f *ConfigurationFile) Parse(path string, internal bool) error {
+	log.WithField("path", path).WithField("parser", f.Parser.String()).Debug("parsing server configuration file")
 
-	// What the fuck is going on here?
 	if mb, err := json.Marshal(config.Get()); err != nil {
 		return err
 	} else {
@@ -204,24 +204,56 @@ func (f *ConfigurationFile) Parse(file ufs.File) error {
 
 	switch f.Parser {
 	case Properties:
-		err = f.parsePropertiesFile(file)
+		err = f.parsePropertiesFile(path)
+		break
 	case File:
-		err = f.parseTextFile(file)
+		err = f.parseTextFile(path)
+		break
 	case Yaml, "yml":
-		err = f.parseYamlFile(file)
+		err = f.parseYamlFile(path)
+		break
 	case Json:
-		err = f.parseJsonFile(file)
+		err = f.parseJsonFile(path)
+		break
 	case Ini:
-		err = f.parseIniFile(file)
+		err = f.parseIniFile(path)
+		break
 	case Xml:
-		err = f.parseXmlFile(file)
+		err = f.parseXmlFile(path)
+		break
 	}
+
+	if errors.Is(err, os.ErrNotExist) {
+		// File doesn't exist, we tried creating it, and same error is returned? Pretty
+		// sure this pathway is impossible, but if not, abort here.
+		if internal {
+			return nil
+		}
+
+		b := strings.TrimSuffix(path, filepath.Base(path))
+		if err := os.MkdirAll(b, 0o755); err != nil {
+			return errors.WithMessage(err, "failed to create base directory for missing configuration file")
+		} else {
+			if _, err := os.Create(path); err != nil {
+				return errors.WithMessage(err, "failed to create missing configuration file")
+			}
+		}
+
+		return f.Parse(path, true)
+	}
+
 	return err
 }
 
 // Parses an xml file.
-func (f *ConfigurationFile) parseXmlFile(file ufs.File) error {
+func (f *ConfigurationFile) parseXmlFile(path string) error {
 	doc := etree.NewDocument()
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
 	if _, err := doc.ReadFrom(file); err != nil {
 		return err
 	}
@@ -299,9 +331,17 @@ func (f *ConfigurationFile) parseXmlFile(file ufs.File) error {
 }
 
 // Parses an ini file.
-func (f *ConfigurationFile) parseIniFile(file ufs.File) error {
-	// Wrap the file in a NopCloser so the ini package doesn't close the file.
-	cfg, err := ini.Load(io.NopCloser(file))
+func (f *ConfigurationFile) parseIniFile(path string) error {
+	// Ini package can't handle a non-existent file, so handle that automatically here
+	// by creating it if not exists. Then, immediately close the file since we will use
+	// other methods to write the new contents.
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return err
+	}
+	file.Close()
+
+	cfg, err := ini.Load(path)
 	if err != nil {
 		return err
 	}
@@ -380,8 +420,8 @@ func (f *ConfigurationFile) parseIniFile(file ufs.File) error {
 // Parses a json file updating any matching key/value pairs. If a match is not found, the
 // value is set regardless in the file. See the commentary in parseYamlFile for more details
 // about what is happening during this process.
-func (f *ConfigurationFile) parseJsonFile(file ufs.File) error {
-	b, err := io.ReadAll(file)
+func (f *ConfigurationFile) parseJsonFile(path string) error {
+	b, err := readFileBytes(path)
 	if err != nil {
 		return err
 	}
@@ -407,8 +447,8 @@ func (f *ConfigurationFile) parseJsonFile(file ufs.File) error {
 
 // Parses a yaml file and updates any matching key/value pairs before persisting
 // it back to the disk.
-func (f *ConfigurationFile) parseYamlFile(file ufs.File) error {
-	b, err := io.ReadAll(file)
+func (f *ConfigurationFile) parseYamlFile(path string) error {
+	b, err := readFileBytes(path)
 	if err != nil {
 		return err
 	}

@@ -4,11 +4,9 @@ import (
 	"runtime"
 
 	"github.com/gammazero/workerpool"
-
-	"github.com/pterodactyl/wings/internal/ufs"
 )
 
-// UpdateConfigurationFiles updates all the defined configuration files for
+// UpdateConfigurationFiles updates all of the defined configuration files for
 // a server automatically to ensure that they always use the specified values.
 func (s *Server) UpdateConfigurationFiles() {
 	pool := workerpool.New(runtime.NumCPU())
@@ -20,18 +18,18 @@ func (s *Server) UpdateConfigurationFiles() {
 		f := cf
 
 		pool.Submit(func() {
-			file, err := s.Filesystem().UnixFS().Touch(f.FileName, ufs.O_RDWR|ufs.O_CREATE, 0o644)
+			p, err := s.Filesystem().SafePath(f.FileName)
 			if err != nil {
-				s.Log().WithField("file_name", f.FileName).WithField("error", err).Error("failed to open file for configuration")
+				s.Log().WithField("error", err).Error("failed to generate safe path for configuration file")
+
 				return
 			}
-			defer file.Close()
 
-			if err := f.Parse(file); err != nil {
+			if err := f.Parse(p, false); err != nil {
 				s.Log().WithField("error", err).Error("failed to parse and update server configuration file")
 			}
 
-			s.Log().WithField("file_name", f.FileName).Debug("finished processing server configuration file")
+			s.Log().WithField("path", f.FileName).Debug("finished processing server configuration file")
 		})
 	}
 
