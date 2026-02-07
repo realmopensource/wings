@@ -165,7 +165,7 @@ out:
 			case "archive":
 				trnsfr.Log().Debug("received archive")
 
-				if err := trnsfr.Server.EnsureDataDirectoryExists(); err != nil {
+				if _, err := trnsfr.Server.EnsureDataDirectoryExists(); err != nil {
 					middleware.CaptureAndAbort(c, err)
 					return
 				}

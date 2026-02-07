@@ -43,7 +43,7 @@ type Filesystem struct {
 func New(path string, size int64, denylist []string) (*Filesystem, error) {
 	r, err := os.OpenRoot(path)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errors.Wrap(err, "server/filesystem: failed to open root")
 	}
 
 	fs := &Filesystem{
