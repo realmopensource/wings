@@ -2,7 +2,6 @@ package filesystem
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -12,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"emperror.dev/errors"
@@ -68,6 +66,7 @@ func (fs *Filesystem) Path() string {
 
 // File returns a reader for a file instance as well as the stat information.
 func (fs *Filesystem) File(p string) (*os.File, Stat, error) {
+	p = strings.TrimLeft(filepath.Clean(p), "/")
 	st, err := fs.Stat(p)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -89,6 +88,7 @@ func (fs *Filesystem) File(p string) (*os.File, Stat, error) {
 // already. If  it is present, the file is opened using the defaults which will truncate
 // the contents. The opened file is then returned to the caller.
 func (fs *Filesystem) Touch(p string, flag int) (*os.File, error) {
+	p = strings.TrimLeft(filepath.Clean(p), "/")
 	f, err := fs.root.OpenFile(p, flag, 0o644)
 	if err == nil {
 		return f, nil
@@ -104,11 +104,11 @@ func (fs *Filesystem) Touch(p string, flag int) (*os.File, error) {
 	if _, err := fs.root.Stat(filepath.Dir(p)); errors.Is(err, os.ErrNotExist) {
 		// Create the path leading up to the file we're trying to create, setting the final perms
 		// on it as we go.
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		if err := fs.root.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			return nil, errors.Wrap(err, "server/filesystem: touch: failed to create directory tree")
 		}
 		if err := fs.Chown(filepath.Dir(p)); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "server/filesystem: touch: failed to chown directory tree")
 		}
 	}
 	o := &fileOpener{root: fs.root}
@@ -126,10 +126,10 @@ func (fs *Filesystem) Touch(p string, flag int) (*os.File, error) {
 // will be created. This will also properly recalculate the disk space used by
 // the server when writing new files or modifying existing ones.
 func (fs *Filesystem) Writefile(p string, r io.Reader) error {
+	p = strings.TrimLeft(filepath.Clean(p), "/")
 	var currentSize int64
 	// If the file does not exist on the system already go ahead and create the pathway
 	// to it and an empty file. We'll then write to it later on after this completes.
-	fmt.Println(p)
 	stat, err := fs.root.Stat(p)
 	if err != nil && !os.IsNotExist(err) {
 		return errors.Wrap(err, "server/filesystem: writefile: failed to stat file")
@@ -167,34 +167,35 @@ func (fs *Filesystem) Writefile(p string, r io.Reader) error {
 
 // CreateDirectory creates a new directory ("name") at a specified path ("p") for the server.
 func (fs *Filesystem) CreateDirectory(name string, p string) error {
-	fmt.Println(path.Join(p, name))
+	p = strings.TrimLeft(filepath.Clean(p), "/")
 	return fs.root.MkdirAll(path.Join(p, name), 0o755)
 }
 
 // Rename moves (or renames) a file or directory.
 func (fs *Filesystem) Rename(from string, to string) error {
-	cleanedTo := path.Clean(to)
+	to = strings.TrimLeft(filepath.Clean(to), "/")
+	from = strings.TrimLeft(filepath.Clean(from), "/")
 
-	// If the target file or directory already exists the rename function will
-	// fail, so just bail out now.
-	if _, err := fs.root.Stat(cleanedTo); err == nil {
-		return os.ErrExist
-	}
-
-	if cleanedTo == fs.Path() {
+	if from == "" || to == "" {
 		return errors.New("server/filesystem: attempting to rename into an invalid directory space")
 	}
 
-	d := strings.TrimSuffix(cleanedTo, path.Base(cleanedTo))
+	// If the target file or directory already exists the rename function will
+	// fail, so just bail out now.
+	if _, err := fs.root.Stat(to); err == nil {
+		return os.ErrExist
+	}
+
+	d := strings.TrimLeft(filepath.Dir(to), "/")
 	// Ensure that the directory we're moving into exists correctly on the system. Only do this if
 	// we're not at the root directory level.
-	if d != fs.Path() {
+	if d != "" {
 		if err := fs.root.MkdirAll(d, 0o755); err != nil {
 			return errors.Wrap(err, "server/filesystem: failed to create directory tree")
 		}
 	}
 
-	return fs.root.Rename(from, cleanedTo)
+	return fs.root.Rename(from, to)
 }
 
 // Begin looping up to 50 times to try and create a unique copy file name. This will take
@@ -236,6 +237,7 @@ func (fs *Filesystem) findCopySuffix(dir string, name string, extension string) 
 // Copies a given file to the same location and appends a suffix to the file to indicate that
 // it has been copied.
 func (fs *Filesystem) Copy(p string) error {
+	p = strings.TrimLeft(filepath.Clean(p), "/")
 	s, err := fs.root.Stat(p)
 	if err != nil {
 		return err
@@ -280,25 +282,23 @@ func (fs *Filesystem) Copy(p string) error {
 // TruncateRootDirectory removes _all_ files and directories from a server's
 // data directory and resets the used disk space to zero.
 func (fs *Filesystem) TruncateRootDirectory() error {
-	if err := fs.root.RemoveAll("/"); err != nil {
-		return err
-	}
-	if err := fs.root.Mkdir("/", 0o755); err != nil {
-		return err
-	}
-	atomic.StoreInt64(&fs.diskUsed, 0)
-	return nil
+	return errors.New("server/filesystem: not implemented")
 }
 
 // Delete removes a file or folder from the system. Prevents the user from
 // accidentally (or maliciously) removing their root server data directory.
 func (fs *Filesystem) Delete(p string) error {
+	p = strings.TrimLeft(filepath.Clean(p), "/")
+	if p == "" {
+		return errors.New("server/filesystem: delete: cannot delete root directory")
+	}
+
 	st, err := fs.root.Lstat(p)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return errors.Wrap(err, "server/filesystem: failed to stat file")
+		return errors.Wrap(err, "server/filesystem: delete: failed to stat file")
 	}
 
 	if st.IsDir() {

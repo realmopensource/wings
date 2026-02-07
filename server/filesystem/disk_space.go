@@ -174,19 +174,6 @@ func (fs *Filesystem) DirectorySize(dir string) (int64, error) {
 				return nil
 			}
 
-			// If this is a symlink then resolve the final destination of it before trying to continue walking
-			// over its contents. If it resolves outside the server data directory just skip everything else for
-			// it. Otherwise, allow it to continue.
-			if e.IsSymlink() {
-				if _, err := fs.SafePath(p); err != nil {
-					if IsErrorCode(err, ErrCodePathResolution) {
-						return godirwalk.SkipThis
-					}
-
-					return err
-				}
-			}
-
 			if !e.IsDir() {
 				_ = syscall.Lstat(p, &st)
 				atomic.AddInt64(&size, st.Size)

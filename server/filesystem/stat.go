@@ -2,9 +2,12 @@ package filesystem
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
+	"emperror.dev/errors"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/goccy/go-json"
 )
@@ -44,16 +47,22 @@ func (s *Stat) MarshalJSON() ([]byte, error) {
 // Stat stats a file or folder and returns the base stat object from go along
 // with the MIME data that can be used for editing files.
 func (fs *Filesystem) Stat(p string) (Stat, error) {
+	p = strings.TrimLeft(filepath.Clean(p), "/")
 	s, err := fs.root.Stat(p)
 	if err != nil {
-		return Stat{}, err
+		return Stat{}, errors.Wrap(err, "server/filesystem: stat: failed to stat file")
 	}
 
 	var m *mimetype.MIME
 	if !s.IsDir() {
-		m, err = mimetype.DetectFile(p)
+		f, err := fs.root.Open(p)
 		if err != nil {
-			return Stat{}, err
+			return Stat{}, errors.Wrap(err, "server/filesystem: stat: failed to open file")
+		}
+		defer f.Close()
+		m, err = mimetype.DetectReader(f)
+		if err != nil {
+			return Stat{}, errors.Wrap(err, "server/filesystem: stat: failed to detect mimetype")
 		}
 	}
 
