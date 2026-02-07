@@ -32,7 +32,14 @@ func (fs *Filesystem) Chown(path string) error {
 	uid := config.Get().System.User.Uid
 	gid := config.Get().System.User.Gid
 
-	// Start by just chowning the initial path that we received.
+	if path == "" {
+		if err := os.Chown(fs.rootPath, uid, gid); err != nil {
+			return errors.Wrap(err, "server/filesystem: chown: failed to chown root directory")
+		}
+
+		return nil
+	}
+
 	if err := fs.root.Chown(path, uid, gid); err != nil {
 		return errors.Wrap(err, "server/filesystem: chown: failed to chown path")
 	}
