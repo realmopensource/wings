@@ -33,6 +33,8 @@ func (fs *Filesystem) IsIgnored(paths ...string) error {
 //
 // This logic is actually copied over from the SFTP server code. Ideally that eventually
 // either gets ported into this application, or is able to make use of this package.
+//
+// deprecated
 func (fs *Filesystem) SafePath(p string) (string, error) {
 	// Start with a cleaned up path before checking the more complex bits.
 	r := fs.unsafeFilePath(p)

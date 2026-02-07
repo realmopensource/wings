@@ -6,23 +6,11 @@ import (
 	"github.com/pterodactyl/wings/config"
 )
 
-// Recursively iterates over a file or directory and sets the permissions on all of the
-// underlying files. Iterate over all of the files and directories. If it is a file just
-// go ahead and perform the chown operation. Otherwise dig deeper into the directory until
-// we've run out of directories to dig into.
-// todo: vulnerable to race condition with symlinks
-// see: https://pkg.go.dev/os#Root
+// Chown recursively iterates over a file or directory and sets the permissions on all the
+// underlying files. Iterate over all the files and directories. If it is a file go ahead
+// and perform the chown operation. Otherwise dig deeper into the directory until we've run
+// out of directories to dig into.
 func (fs *Filesystem) Chown(path string) error {
-	return fs.unsafeChown(path)
-}
-
-// unsafeChown chowns the given path, without checking if the path is safe. This should only be used
-// when the path has already been checked.
-func (fs *Filesystem) unsafeChown(path string) error {
-	if fs.isTest {
-		return nil
-	}
-
 	uid := config.Get().System.User.Uid
 	gid := config.Get().System.User.Gid
 
@@ -38,7 +26,7 @@ func (fs *Filesystem) unsafeChown(path string) error {
 	}
 
 	// If this was a directory, begin walking over its contents recursively and ensure that all
-	// of the subfiles and directories get their permissions updated as well.
+	// the subfiles and directories get their permissions updated as well.
 	err := godirwalk.Walk(path, &godirwalk.Options{
 		Unsorted: true,
 		Callback: func(p string, e *godirwalk.Dirent) error {

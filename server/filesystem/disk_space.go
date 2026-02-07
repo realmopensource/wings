@@ -158,16 +158,17 @@ func (fs *Filesystem) updateCachedDiskUsage() (int64, error) {
 // through all of the folders. Returns the size in bytes. This can be a fairly taxing operation
 // on locations with tons of files, so it is recommended that you cache the output.
 func (fs *Filesystem) DirectorySize(dir string) (int64, error) {
-	d, err := fs.SafePath(dir)
-	if err != nil {
-		return 0, err
-	}
-
 	var size int64
 	var st syscall.Stat_t
 
-	err = godirwalk.Walk(d, &godirwalk.Options{
-		Unsorted: true,
+	// todo: safely traverse directory within root?
+	if _, err := fs.root.Lstat(dir); err != nil {
+		return 0, err
+	}
+
+	err := godirwalk.Walk(dir, &godirwalk.Options{
+		Unsorted:            true,
+		FollowSymbolicLinks: false,
 		Callback: func(p string, e *godirwalk.Dirent) error {
 			if !e.ModeType().IsRegular() {
 				return nil

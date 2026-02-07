@@ -138,3 +138,13 @@ func wrapError(err error, resolved string) error {
 	}
 	return errors.WithStackDepth(&Error{code: ErrCodeUnknownError, err: err, resolved: resolved}, 1)
 }
+
+func IsPathError(err error) bool {
+	var pe *os.PathError
+	return errors.As(err, &pe)
+}
+
+func IsLinkError(err error) bool {
+	var le *os.LinkError
+	return errors.As(err, &le)
+}

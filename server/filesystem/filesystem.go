@@ -162,53 +162,39 @@ func (fs *Filesystem) Writefile(p string, r io.Reader) error {
 	// Adjust the disk usage to account for the old size and the new size of the file.
 	fs.addDisk(sz - currentSize)
 
-	return fs.unsafeChown(p)
+	return fs.Chown(p)
 }
 
-// Creates a new directory (name) at a specified path (p) for the server.
+// CreateDirectory creates a new directory ("name") at a specified path ("p") for the server.
 func (fs *Filesystem) CreateDirectory(name string, p string) error {
-	cleaned, err := fs.SafePath(path.Join(p, name))
-	if err != nil {
-		return err
-	}
-	return os.MkdirAll(cleaned, 0o755)
+	fmt.Println(path.Join(p, name))
+	return fs.root.MkdirAll(path.Join(p, name), 0o755)
 }
 
 // Rename moves (or renames) a file or directory.
 func (fs *Filesystem) Rename(from string, to string) error {
-	cleanedFrom, err := fs.SafePath(from)
-	if err != nil {
-		return errors.WithStack(err)
-	}
+	cleanedTo := path.Clean(to)
 
-	cleanedTo, err := fs.SafePath(to)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	// If the target file or directory already exists the rename function will fail, so just
-	// bail out now.
-	if _, err := os.Stat(cleanedTo); err == nil {
+	// If the target file or directory already exists the rename function will
+	// fail, so just bail out now.
+	if _, err := fs.root.Stat(cleanedTo); err == nil {
 		return os.ErrExist
 	}
 
 	if cleanedTo == fs.Path() {
-		return errors.New("attempting to rename into an invalid directory space")
+		return errors.New("server/filesystem: attempting to rename into an invalid directory space")
 	}
 
 	d := strings.TrimSuffix(cleanedTo, path.Base(cleanedTo))
 	// Ensure that the directory we're moving into exists correctly on the system. Only do this if
 	// we're not at the root directory level.
 	if d != fs.Path() {
-		if mkerr := os.MkdirAll(d, 0o755); mkerr != nil {
-			return errors.WithMessage(mkerr, "failed to create directory structure for file rename")
+		if err := fs.root.MkdirAll(d, 0o755); err != nil {
+			return errors.Wrap(err, "server/filesystem: failed to create directory tree")
 		}
 	}
 
-	if err := os.Rename(cleanedFrom, cleanedTo); err != nil {
-		return errors.WithStack(err)
-	}
-	return nil
+	return fs.root.Rename(from, cleanedTo)
 }
 
 // Begin looping up to 50 times to try and create a unique copy file name. This will take
@@ -307,86 +293,23 @@ func (fs *Filesystem) TruncateRootDirectory() error {
 // Delete removes a file or folder from the system. Prevents the user from
 // accidentally (or maliciously) removing their root server data directory.
 func (fs *Filesystem) Delete(p string) error {
-	// This is one of the few (only?) places in the codebase where we're explicitly not using
-	// the SafePath functionality when working with user provided input. If we did, you would
-	// not be able to delete a file that is a symlink pointing to a location outside the data
-	// directory.
-	//
-	// We also want to avoid resolving a symlink that points _within_ the data directory and thus
-	// deleting the actual source file for the symlink rather than the symlink itself. For these
-	// purposes just resolve the actual file path using filepath.Join() and confirm that the path
-	// exists within the data directory.
-	resolved := fs.unsafeFilePath(p)
-	if !fs.unsafeIsInDataDirectory(resolved) {
-		return NewBadPathResolution(p, resolved)
-	}
-
-	// Block any whoopsies.
-	if resolved == fs.Path() {
-		return errors.New("cannot delete root server directory")
-	}
-
-	st, err := fs.root.Lstat(resolved)
+	st, err := fs.root.Lstat(p)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			fs.error(err).Warn("error while attempting to stat file before deletion")
-			return err
+		if os.IsNotExist(err) {
+			return nil
 		}
-
-		// The following logic is used to handle a case where a user attempts to
-		// delete a file that does not exist through a directory symlink.
-		// We don't want to reveal that the file does not exist, so we validate
-		// the path of the symlink and return a bad path error if it is invalid.
-
-		// The requested file or directory doesn't exist, so at this point we
-		// need to iterate up the path chain until we hit a directory that
-		// _does_ exist and can be validated.
-		parts := strings.Split(filepath.Dir(resolved), "/")
-
-		// Range over all the path parts and form directory paths from the end
-		// moving up until we have a valid resolution, or we run out of paths to
-		// try.
-		for k := range parts {
-			try := strings.Join(parts[:(len(parts)-k)], "/")
-			if !fs.unsafeIsInDataDirectory(try) {
-				break
-			}
-
-			t, err := filepath.EvalSymlinks(try)
-			if err == nil {
-				if !fs.unsafeIsInDataDirectory(t) {
-					return NewBadPathResolution(p, t)
-				}
-				break
-			}
-		}
-
-		// Always return early if the file does not exist.
-		return nil
-	}
-
-	// If the file is not a symlink, we need to check that it is not within a
-	// symlinked directory that points outside the data directory.
-	if st.Mode()&os.ModeSymlink == 0 {
-		ep, err := filepath.EvalSymlinks(resolved)
-		if err != nil {
-			if !os.IsNotExist(err) {
-				return err
-			}
-		} else if !fs.unsafeIsInDataDirectory(ep) {
-			return NewBadPathResolution(p, ep)
-		}
+		return errors.Wrap(err, "server/filesystem: failed to stat file")
 	}
 
 	if st.IsDir() {
-		if s, err := fs.DirectorySize(resolved); err == nil {
+		if s, err := fs.DirectorySize(p); err == nil {
 			fs.addDisk(-s)
 		}
 	} else {
 		fs.addDisk(-st.Size())
 	}
 
-	return fs.root.RemoveAll(resolved)
+	return fs.root.RemoveAll(p)
 }
 
 type fileOpener struct {
