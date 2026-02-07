@@ -89,37 +89,57 @@ func TestFilesystem_Blocks_Symlinks(t *testing.T) {
 		})
 
 		g.It("cannot create a nested directory outside the root", func() {
-			err := fs.CreateDirectory("my/nested/dir", "external_dir/foo/bar")
+			err := fs.CreateDirectory("my/nested/dir", "../external_dir/foo/bar")
 			g.Assert(err).IsNotNil()
 			g.Assert(IsPathError(err)).IsTrue()
 		})
 
 		g.It("cannot create a nested directory outside the root", func() {
-			err := fs.CreateDirectory("my/nested/dir", "external_dir/server")
+			err := fs.CreateDirectory("my/nested/dir", "../external_dir/server")
 			g.Assert(err).IsNotNil()
 			g.Assert(IsPathError(err)).IsTrue()
 		})
 	})
 
 	g.Describe("Rename", func() {
-		g.It("cannot rename a file symlinked outside the directory root", func() {
+		// You can rename the symlink file itself, which does not impact the
+		// underlying symlinked target file outside the server directory.
+		g.It("can rename a file symlinked outside the directory root", func() {
 			err := fs.Rename("symlinked.txt", "foo.txt")
-			g.Assert(err).IsNotNil()
-			g.Assert(IsPathError(err)).IsTrue()
+			g.Assert(err).IsNil()
+
+			st, err := os.Lstat(filepath.Join(fs.rootPath, "foo.txt"))
+			g.Assert(err).IsNil()
+			g.Assert(st.Mode()&os.ModeSymlink != 0).IsTrue()
+
+			st, err = os.Lstat(filepath.Join(fs.rootPath, "../malicious.txt"))
+			g.Assert(err).IsNil()
+			g.Assert(st.Mode()&os.ModeSymlink == 0).IsTrue()
 		})
 
-		g.It("cannot rename a symlinked directory outside the root", func() {
+		// The same as above, acts on the source directory and not the target directory,
+		// therefore, this is allowed.
+		g.It("can rename a directory symlinked outside the root", func() {
 			err := fs.Rename("external_dir", "foo")
-			g.Assert(err).IsNotNil()
-			g.Assert(IsPathError(err)).IsTrue()
+			g.Assert(err).IsNil()
+
+			st, err := os.Lstat(filepath.Join(fs.rootPath, "foo"))
+			g.Assert(err).IsNil()
+			g.Assert(st.IsDir()).IsTrue()
+			g.Assert(st.Mode()&os.ModeSymlink != 0).IsTrue()
+
+			st, err = os.Lstat(filepath.Join(fs.rootPath, "../external_dir"))
+			g.Assert(err).IsNil()
+			g.Assert(st.IsDir()).IsTrue()
+			g.Assert(st.Mode()&os.ModeSymlink == 0).IsTrue()
 		})
 
 		g.It("cannot rename a file to a location outside the directory root", func() {
 			fs.write("my_file.txt", []byte("internal content"))
 
-			err := fs.Rename("my_file.txt", "external_dir/my_file.txt")
+			err := fs.Rename("my_file.txt", "../external_dir/my_file.txt")
 			g.Assert(err).IsNotNil()
-			g.Assert(IsLinkError(err)).IsTrue()
+			g.Assert(IsPathError(err)).IsTrue()
 		})
 	})
 
@@ -159,7 +179,5 @@ func TestFilesystem_Blocks_Symlinks(t *testing.T) {
 		})
 	})
 
-	g.After(func() {
-		fs.reset()
-	})
+	fs.reset()
 }

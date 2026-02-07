@@ -50,13 +50,20 @@ func (fs *Filesystem) Chown(path string) error {
 	// If this was a directory, begin walking over its contents recursively and ensure that all
 	// the subfiles and directories get their permissions updated as well.
 	err := godirwalk.Walk(filepath.Join(fs.rootPath, path), &godirwalk.Options{
-		Unsorted: true,
+		Unsorted:            true,
+		FollowSymbolicLinks: false,
 		Callback: func(p string, e *godirwalk.Dirent) error {
-			return fs.root.Chown(p, uid, gid)
+			p = strings.TrimLeft(strings.TrimPrefix(p, fs.Path()), "/")
+
+			if err := fs.root.Chown(p, uid, gid); err != nil {
+				return errors.Wrap(err, "server/filesystem: chown: failed to chown during walk")
+			}
+
+			return nil
 		},
 	})
 
-	return errors.Wrap(err, "server/filesystem: chown: failed to chown during walk function")
+	return errors.Wrap(err, "server/filesystem: chown: failed to chown directory tree")
 }
 
 func (fs *Filesystem) Chtimes(path string, atime, mtime time.Time) error {

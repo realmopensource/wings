@@ -177,7 +177,7 @@ func (fs *Filesystem) Rename(from string, to string) error {
 	from = strings.TrimLeft(filepath.Clean(from), "/")
 
 	if from == "" || to == "" {
-		return errors.New("server/filesystem: attempting to rename into an invalid directory space")
+		return os.ErrExist
 	}
 
 	// If the target file or directory already exists the rename function will

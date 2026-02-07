@@ -1,9 +1,10 @@
 package filesystem
 
 import (
+	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"emperror.dev/errors"
@@ -158,15 +159,15 @@ func (fs *Filesystem) updateCachedDiskUsage() (int64, error) {
 // through all of the folders. Returns the size in bytes. This can be a fairly taxing operation
 // on locations with tons of files, so it is recommended that you cache the output.
 func (fs *Filesystem) DirectorySize(dir string) (int64, error) {
-	var size int64
-	var st syscall.Stat_t
-
-	// todo: safely traverse directory within root?
-	if _, err := fs.root.Lstat(dir); err != nil {
-		return 0, err
+	dir = strings.TrimLeft(filepath.Clean(dir), "/")
+	if dir != "" {
+		if _, err := fs.root.Lstat(dir); err != nil {
+			return 0, err
+		}
 	}
 
-	err := godirwalk.Walk(dir, &godirwalk.Options{
+	var size int64
+	err := godirwalk.Walk(filepath.Join(fs.rootPath, dir), &godirwalk.Options{
 		Unsorted:            true,
 		FollowSymbolicLinks: false,
 		Callback: func(p string, e *godirwalk.Dirent) error {
@@ -175,12 +176,14 @@ func (fs *Filesystem) DirectorySize(dir string) (int64, error) {
 			}
 
 			if !e.IsDir() {
-				_ = syscall.Lstat(p, &st)
-				atomic.AddInt64(&size, st.Size)
+				st, err := fs.root.Lstat(strings.TrimLeft(strings.TrimPrefix(p, fs.rootPath), "/"))
+				if err != nil {
+					return errors.Wrap(err, "server/filesystem: directorysize: failed to stat file")
+				}
+				atomic.AddInt64(&size, st.Size())
 			}
 
 			// todo: don't count hardlinks twice
-
 			return nil
 		},
 	})

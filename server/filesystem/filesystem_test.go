@@ -19,6 +19,7 @@ import (
 
 type testFs struct {
 	*Filesystem
+	tmpDir string
 }
 
 func NewFs() *testFs {
@@ -41,7 +42,7 @@ func NewFs() *testFs {
 	}
 	fs.isTest = true
 
-	tfs := &testFs{fs}
+	tfs := &testFs{Filesystem: fs, tmpDir: tmpDir}
 	tfs.reset()
 
 	return tfs
@@ -59,19 +60,22 @@ func (tfs *testFs) reset() {
 	if err := tfs.root.Close(); err != nil {
 		panic(err)
 	}
-
-	o := filepath.Dir(tfs.rootPath)
-	if !strings.HasPrefix(o, filepath.Dir(tfs.rootPath)) {
-		panic("filesystem_test: attempting to delete outside root directory: " + o)
+	if !strings.HasPrefix(tfs.tmpDir, "/tmp/pterodactyl") {
+		panic("filesystem_test: attempting to delete outside root directory: " + tfs.tmpDir)
 	}
 
-	if err := os.RemoveAll(o); err != nil {
+	if err := os.RemoveAll(tfs.tmpDir); err != nil {
 		if !os.IsNotExist(err) {
 			panic(err)
 		}
 	}
 
-	if err := os.Mkdir(tfs.rootPath, 0o755); err != nil {
+	if !strings.HasPrefix(tfs.rootPath, tfs.tmpDir) {
+		panic("filesystem_test: mismatch between root and tmp paths")
+	}
+
+	tfs.rootPath = filepath.Join(tfs.tmpDir, "/server")
+	if err := os.MkdirAll(tfs.rootPath, 0o755); err != nil {
 		panic(err)
 	}
 
@@ -176,7 +180,11 @@ func TestFilesystem_Writefile(t *testing.T) {
 		g.It("cannot create a file outside the root directory", func() {
 			r := bytes.NewReader([]byte("test file content"))
 
-			err := fs.Writefile("/some/foo/../../../test.txt", r)
+			err := fs.Writefile("../../etc/test.txt", r)
+			g.Assert(err).IsNotNil()
+			g.Assert(IsPathError(err)).IsTrue()
+
+			err = fs.Writefile("a/../../../test.txt", r)
 			g.Assert(err).IsNotNil()
 			g.Assert(IsPathError(err)).IsTrue()
 		})
@@ -299,9 +307,9 @@ func TestFilesystem_Rename(t *testing.T) {
 		})
 
 		g.It("does not allow renaming from a location outside the root", func() {
-			err := fs.Rename("/../ext-source.txt", "target.txt")
+			err := fs.Rename("../ext-source.txt", "target.txt")
 			g.Assert(err).IsNotNil()
-			g.Assert(IsPathError(err)).IsTrue()
+			g.Assert(IsLinkError(err)).IsTrue()
 		})
 
 		g.It("allows a file to be renamed", func() {
@@ -312,7 +320,7 @@ func TestFilesystem_Rename(t *testing.T) {
 			g.Assert(err).IsNotNil()
 			g.Assert(errors.Is(err, os.ErrNotExist)).IsTrue()
 
-			st, err := fs.Stat(filepath.Join(fs.rootPath, "target.txt"))
+			st, err := os.Stat(filepath.Join(fs.rootPath, "target.txt"))
 			g.Assert(err).IsNil()
 			g.Assert(st.Name()).Equal("target.txt")
 			g.Assert(st.Size()).IsNotZero()
@@ -330,7 +338,7 @@ func TestFilesystem_Rename(t *testing.T) {
 			g.Assert(err).IsNotNil()
 			g.Assert(errors.Is(err, os.ErrNotExist)).IsTrue()
 
-			st, err := fs.Stat(filepath.Join(fs.rootPath, "target_dir"))
+			st, err := os.Stat(filepath.Join(fs.rootPath, "target_dir"))
 			g.Assert(err).IsNil()
 			g.Assert(st.IsDir()).IsTrue()
 		})
@@ -345,7 +353,7 @@ func TestFilesystem_Rename(t *testing.T) {
 			err := fs.Rename("source.txt", "nested/folder/target.txt")
 			g.Assert(err).IsNil()
 
-			st, err := fs.Stat(filepath.Join(fs.rootPath, "nested/folder/target.txt"))
+			st, err := os.Stat(filepath.Join(fs.rootPath, "nested/folder/target.txt"))
 			g.Assert(err).IsNil()
 			g.Assert(st.Name()).Equal("target.txt")
 		})
@@ -478,7 +486,7 @@ func TestFilesystem_Delete(t *testing.T) {
 		g.It("does not allow the deletion of the root directory", func() {
 			err := fs.Delete("/")
 			g.Assert(err).IsNotNil()
-			g.Assert(err.Error()).Equal("cannot delete root server directory")
+			g.Assert(err.Error()).Equal("server/filesystem: delete: cannot delete root directory")
 		})
 
 		g.It("does not return an error if the target does not exist", func() {
