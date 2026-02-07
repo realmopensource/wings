@@ -15,12 +15,11 @@ import (
 
 func TestArchive_Stream(t *testing.T) {
 	g := Goblin(t)
-	fs, rfs := NewFs()
+	fs := NewFs()
 
 	g.Describe("Archive", func() {
 		g.AfterEach(func() {
-			// Reset the filesystem after each run.
-			rfs.reset()
+			fs.reset()
 		})
 
 		g.It("throws an error when passed invalid file paths", func() {
@@ -61,7 +60,7 @@ func TestArchive_Stream(t *testing.T) {
 			}
 
 			// Create the archive.
-			archivePath := filepath.Join(rfs.root, "archive.tar.gz")
+			archivePath := filepath.Join(fs.rootPath, "../archive.tar.gz")
 			g.Assert(a.Create(context.Background(), archivePath)).IsNil()
 
 			// Ensure the archive exists.
@@ -119,7 +118,7 @@ func getFiles(f iofs.ReadDirFS, name string) ([]string, error) {
 			if files == nil {
 				return nil, nil
 			}
-			
+
 			v = append(v, files...)
 			continue
 		}

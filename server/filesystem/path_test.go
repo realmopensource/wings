@@ -12,11 +12,11 @@ import (
 
 func TestFilesystem_Path(t *testing.T) {
 	g := Goblin(t)
-	fs, rfs := NewFs()
+	fs := NewFs()
 
 	g.Describe("Path", func() {
 		g.It("returns the root path for the instance", func() {
-			g.Assert(fs.Path()).Equal(filepath.Join(rfs.root, "/server"))
+			g.Assert(fs.Path()).Equal(fs.rootPath)
 		})
 	})
 }
@@ -27,30 +27,24 @@ func TestFilesystem_Path(t *testing.T) {
 // the calls and ensure they all fail with the same reason.
 func TestFilesystem_Blocks_Symlinks(t *testing.T) {
 	g := Goblin(t)
-	fs, rfs := NewFs()
+	fs := NewFs()
 
-	if err := rfs.CreateServerFileFromString("/../malicious.txt", "external content"); err != nil {
+	fs.write("../malicious.txt", []byte("external content"))
+	if err := os.Mkdir(filepath.Join(fs.rootPath, "../malicious_dir"), 0o777); err != nil {
 		panic(err)
 	}
 
-	if err := os.Mkdir(filepath.Join(rfs.root, "/malicious_dir"), 0o777); err != nil {
-		panic(err)
+	links := map[string]string{
+		"../malicious.txt":                "/symlinked.txt",
+		"../malicious_does_not_exist.txt": "/symlinked_does_not_exist.txt",
+		"/symlinked_does_not_exist.txt":   "/symlinked_does_not_exist2.txt",
+		"../malicious_dir":                "/external_dir",
 	}
 
-	if err := os.Symlink(filepath.Join(rfs.root, "malicious.txt"), filepath.Join(rfs.root, "/server/symlinked.txt")); err != nil {
-		panic(err)
-	}
-
-	if err := os.Symlink(filepath.Join(rfs.root, "malicious_does_not_exist.txt"), filepath.Join(rfs.root, "/server/symlinked_does_not_exist.txt")); err != nil {
-		panic(err)
-	}
-
-	if err := os.Symlink(filepath.Join(rfs.root, "/server/symlinked_does_not_exist.txt"), filepath.Join(rfs.root, "/server/symlinked_does_not_exist2.txt")); err != nil {
-		panic(err)
-	}
-
-	if err := os.Symlink(filepath.Join(rfs.root, "/malicious_dir"), filepath.Join(rfs.root, "/server/external_dir")); err != nil {
-		panic(err)
+	for src, dst := range links {
+		if err := os.Symlink(filepath.Join(fs.rootPath, src), filepath.Join(fs.rootPath, dst)); err != nil {
+			panic(err)
+		}
 	}
 
 	g.Describe("Writefile", func() {
@@ -121,9 +115,7 @@ func TestFilesystem_Blocks_Symlinks(t *testing.T) {
 		})
 
 		g.It("cannot rename a file to a location outside the directory root", func() {
-			if err := rfs.CreateServerFileFromString("my_file.txt", "internal content"); err != nil {
-				panic(err)
-			}
+			fs.write("my_file.txt", []byte("internal content"))
 
 			err := fs.Rename("my_file.txt", "external_dir/my_file.txt")
 			g.Assert(err).IsNotNil()
@@ -158,14 +150,16 @@ func TestFilesystem_Blocks_Symlinks(t *testing.T) {
 			err := fs.Delete("symlinked.txt")
 			g.Assert(err).IsNil()
 
-			_, err = os.Stat(filepath.Join(rfs.root, "malicious.txt"))
+			_, err = os.Stat(filepath.Join(fs.rootPath, "../malicious.txt"))
 			g.Assert(err).IsNil()
 
-			_, err = rfs.StatServerFile("symlinked.txt")
+			_, err = os.Stat(filepath.Join(fs.rootPath, "symlinked.txt"))
 			g.Assert(err).IsNotNil()
 			g.Assert(errors.Is(err, os.ErrNotExist)).IsTrue()
 		})
 	})
 
-	rfs.reset()
+	g.After(func() {
+		fs.reset()
+	})
 }
