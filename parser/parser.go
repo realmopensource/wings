@@ -2,10 +2,10 @@ package parser
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"io"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -161,14 +161,14 @@ func (cfr *ConfigurationFileReplacement) UnmarshalJSON(data []byte) error {
 	iv, err := jsonparser.GetString(data, "if_value")
 	// We only check keypath here since match & replace_with should be present on all of
 	// them, however if_value is optional.
-	if err != nil && err != jsonparser.KeyPathNotFoundError {
+	if err != nil && !errors.Is(err, jsonparser.KeyPathNotFoundError) {
 		return err
 	}
 	cfr.IfValue = iv
 
 	rw, dt, _, err := jsonparser.Get(data, "replace_with")
 	if err != nil {
-		if err != jsonparser.KeyPathNotFoundError {
+		if !errors.Is(err, jsonparser.KeyPathNotFoundError) {
 			return err
 		}
 
@@ -188,11 +188,12 @@ func (cfr *ConfigurationFileReplacement) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Parses a given configuration file and updates all of the values within as defined
-// in the API response from the Panel.
-func (f *ConfigurationFile) Parse(path string, internal bool) error {
-	log.WithField("path", path).WithField("parser", f.Parser.String()).Debug("parsing server configuration file")
+// Parse parses a given configuration file and updates all the values within
+// as defined in the API response from the Panel.
+func (f *ConfigurationFile) Parse(file *os.File) error {
+	// log.WithField("path", path).WithField("parser", f.Parser.String()).Debug("parsing server configuration file")
 
+	// What the fuck is going on here?
 	if mb, err := json.Marshal(config.Get()); err != nil {
 		return err
 	} else {
@@ -203,56 +204,24 @@ func (f *ConfigurationFile) Parse(path string, internal bool) error {
 
 	switch f.Parser {
 	case Properties:
-		err = f.parsePropertiesFile(path)
-		break
+		err = f.parsePropertiesFile(file)
 	case File:
-		err = f.parseTextFile(path)
-		break
+		err = f.parseTextFile(file)
 	case Yaml, "yml":
-		err = f.parseYamlFile(path)
-		break
+		err = f.parseYamlFile(file)
 	case Json:
-		err = f.parseJsonFile(path)
-		break
+		err = f.parseJsonFile(file)
 	case Ini:
-		err = f.parseIniFile(path)
-		break
+		err = f.parseIniFile(file)
 	case Xml:
-		err = f.parseXmlFile(path)
-		break
+		err = f.parseXmlFile(file)
 	}
-
-	if errors.Is(err, os.ErrNotExist) {
-		// File doesn't exist, we tried creating it, and same error is returned? Pretty
-		// sure this pathway is impossible, but if not, abort here.
-		if internal {
-			return nil
-		}
-
-		b := strings.TrimSuffix(path, filepath.Base(path))
-		if err := os.MkdirAll(b, 0o755); err != nil {
-			return errors.WithMessage(err, "failed to create base directory for missing configuration file")
-		} else {
-			if _, err := os.Create(path); err != nil {
-				return errors.WithMessage(err, "failed to create missing configuration file")
-			}
-		}
-
-		return f.Parse(path, true)
-	}
-
 	return err
 }
 
 // Parses an xml file.
-func (f *ConfigurationFile) parseXmlFile(path string) error {
+func (f *ConfigurationFile) parseXmlFile(file *os.File) error {
 	doc := etree.NewDocument()
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
 	if _, err := doc.ReadFrom(file); err != nil {
 		return err
 	}
@@ -330,17 +299,9 @@ func (f *ConfigurationFile) parseXmlFile(path string) error {
 }
 
 // Parses an ini file.
-func (f *ConfigurationFile) parseIniFile(path string) error {
-	// Ini package can't handle a non-existent file, so handle that automatically here
-	// by creating it if not exists. Then, immediately close the file since we will use
-	// other methods to write the new contents.
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
-	if err != nil {
-		return err
-	}
-	file.Close()
-
-	cfg, err := ini.Load(path)
+func (f *ConfigurationFile) parseIniFile(file *os.File) error {
+	// Wrap the file in a NopCloser so the ini package doesn't close the file.
+	cfg, err := ini.Load(io.NopCloser(file))
 	if err != nil {
 		return err
 	}
@@ -419,8 +380,8 @@ func (f *ConfigurationFile) parseIniFile(path string) error {
 // Parses a json file updating any matching key/value pairs. If a match is not found, the
 // value is set regardless in the file. See the commentary in parseYamlFile for more details
 // about what is happening during this process.
-func (f *ConfigurationFile) parseJsonFile(path string) error {
-	b, err := readFileBytes(path)
+func (f *ConfigurationFile) parseJsonFile(file *os.File) error {
+	b, err := io.ReadAll(file)
 	if err != nil {
 		return err
 	}
@@ -430,14 +391,24 @@ func (f *ConfigurationFile) parseJsonFile(path string) error {
 		return err
 	}
 
-	output := []byte(data.StringIndent("", "    "))
-	return os.WriteFile(path, output, 0o644)
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	if err := file.Truncate(0); err != nil {
+		return err
+	}
+
+	// Write the data to the file.
+	if _, err := io.Copy(file, bytes.NewReader(data.BytesIndent("", "    "))); err != nil {
+		return errors.Wrap(err, "parser: failed to write properties file to disk")
+	}
+	return nil
 }
 
 // Parses a yaml file and updates any matching key/value pairs before persisting
 // it back to the disk.
-func (f *ConfigurationFile) parseYamlFile(path string) error {
-	b, err := readFileBytes(path)
+func (f *ConfigurationFile) parseYamlFile(file *os.File) error {
+	b, err := io.ReadAll(file)
 	if err != nil {
 		return err
 	}
@@ -468,35 +439,56 @@ func (f *ConfigurationFile) parseYamlFile(path string) error {
 		return err
 	}
 
-	return os.WriteFile(path, marshaled, 0o644)
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	if err := file.Truncate(0); err != nil {
+		return err
+	}
+
+	// Write the data to the file.
+	if _, err := io.Copy(file, bytes.NewReader(marshaled)); err != nil {
+		return errors.Wrap(err, "parser: failed to write properties file to disk")
+	}
+	return nil
 }
 
 // Parses a text file using basic find and replace. This is a highly inefficient method of
 // scanning a file and performing a replacement. You should attempt to use anything other
 // than this function where possible.
-func (f *ConfigurationFile) parseTextFile(path string) error {
-	input, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-
-	lines := strings.Split(string(input), "\n")
-	for i, line := range lines {
+func (f *ConfigurationFile) parseTextFile(file *os.File) error {
+	b := bytes.NewBuffer(nil)
+	s := bufio.NewScanner(file)
+	var replaced bool
+	for s.Scan() {
+		line := s.Bytes()
+		replaced = false
 		for _, replace := range f.Replace {
 			// If this line doesn't match what we expect for the replacement, move on to the next
 			// line. Otherwise, update the line to have the replacement value.
-			if !strings.HasPrefix(line, replace.Match) {
+			if !bytes.HasPrefix(line, []byte(replace.Match)) {
 				continue
 			}
-
-			lines[i] = replace.ReplaceWith.String()
+			b.Write(replace.ReplaceWith.Bytes())
+			replaced = true
 		}
+		if !replaced {
+			b.Write(line)
+		}
+		b.WriteByte('\n')
 	}
 
-	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	if err := file.Truncate(0); err != nil {
 		return err
 	}
 
+	// Write the data to the file.
+	if _, err := io.Copy(file, b); err != nil {
+		return errors.Wrap(err, "parser: failed to write properties file to disk")
+	}
 	return nil
 }
 
@@ -526,31 +518,29 @@ func (f *ConfigurationFile) parseTextFile(path string) error {
 //
 // @see https://github.com/pterodactyl/panel/issues/2308 (original)
 // @see https://github.com/pterodactyl/panel/issues/3009 ("bug" introduced as result)
-func (f *ConfigurationFile) parsePropertiesFile(path string) error {
-	var s strings.Builder
-	// Open the file and attempt to load any comments that currenty exist at the start
-	// of the file. This is kind of a hack, but should work for a majority of users for
-	// the time being.
-	if fd, err := os.Open(path); err != nil {
-		return errors.Wrap(err, "parser: could not open file for reading")
-	} else {
-		scanner := bufio.NewScanner(fd)
-		// Scan until we hit a line that is not a comment that actually has content
-		// on it. Keep appending the comments until that time.
-		for scanner.Scan() {
-			text := scanner.Text()
-			if len(text) > 0 && text[0] != '#' {
-				break
-			}
-			s.WriteString(text + "\n")
-		}
-		_ = fd.Close()
-		if err := scanner.Err(); err != nil {
-			return errors.WithStackIf(err)
-		}
+func (f *ConfigurationFile) parsePropertiesFile(file *os.File) error {
+	b, err := io.ReadAll(file)
+	if err != nil {
+		return err
 	}
 
-	p, err := properties.LoadFile(path, properties.UTF8)
+	s := bytes.NewBuffer(nil)
+	scanner := bufio.NewScanner(bytes.NewReader(b))
+	// Scan until we hit a line that is not a comment that actually has content
+	// on it. Keep appending the comments until that time.
+	for scanner.Scan() {
+		text := scanner.Bytes()
+		if len(text) > 0 && text[0] != '#' {
+			break
+		}
+		s.Write(text)
+		s.WriteByte('\n')
+	}
+	if err := scanner.Err(); err != nil {
+		return errors.WithStackIf(err)
+	}
+
+	p, err := properties.Load(b, properties.UTF8)
 	if err != nil {
 		return errors.Wrap(err, "parser: could not load properties file for configuration update")
 	}
@@ -588,17 +578,16 @@ func (f *ConfigurationFile) parsePropertiesFile(path string) error {
 		s.WriteString(key + "=" + strings.Trim(strconv.QuoteToASCII(value), "\"") + "\n")
 	}
 
-	// Open the file for writing.
-	w, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
-	if err != nil {
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
-	defer w.Close()
-
-	// Write the data to the file.
-	if _, err := w.Write([]byte(s.String())); err != nil {
-		return errors.Wrap(err, "parser: failed to write properties file to disk")
+	if err := file.Truncate(0); err != nil {
+		return err
 	}
 
+	// Write the data to the file.
+	if _, err := io.Copy(file, s); err != nil {
+		return errors.Wrap(err, "parser: failed to write properties file to disk")
+	}
 	return nil
 }

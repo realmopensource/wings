@@ -1,6 +1,7 @@
 package filesystem
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,7 +37,7 @@ func (fs *Filesystem) Chown(path string) error {
 	uid := config.Get().System.User.Uid
 	gid := config.Get().System.User.Gid
 	if err := fs.root.Chown(path, uid, gid); err != nil {
-		return errors.Wrap(err, "server/filesystem: chown: failed to chown path")
+		return errors.WrapIf(err, "server/filesystem: chown: failed to chown path")
 	}
 
 	// If this is not a directory, we can now return from the function; there is nothing
@@ -46,9 +47,10 @@ func (fs *Filesystem) Chown(path string) error {
 			return nil
 		}
 
-		return errors.Wrap(err, "server/filesystem: chown: failed to stat path")
+		return errors.WrapIf(err, "server/filesystem: chown: failed to stat path")
 	}
 
+	fmt.Println("walking path", filepath.Join(fs.rootPath, path))
 	// If this was a directory, begin walking over its contents recursively and ensure that all
 	// the subfiles and directories get their permissions updated as well.
 	err := godirwalk.Walk(filepath.Join(fs.rootPath, path), &godirwalk.Options{
@@ -56,16 +58,19 @@ func (fs *Filesystem) Chown(path string) error {
 		FollowSymbolicLinks: false,
 		Callback: func(p string, e *godirwalk.Dirent) error {
 			p = strings.TrimLeft(strings.TrimPrefix(p, fs.Path()), "/")
+			if p == "" {
+				return godirwalk.SkipThis
+			}
 
 			if err := fs.root.Chown(p, uid, gid); err != nil {
-				return errors.Wrap(err, "server/filesystem: chown: failed to chown during walk")
+				return errors.Wrap(err, fmt.Sprintf("server/filesystem: chown: failed to chown file"))
 			}
 
 			return nil
 		},
 	})
 
-	return errors.Wrap(err, "server/filesystem: chown: failed to chown directory tree")
+	return errors.WrapIf(err, "server/filesystem: chown: failed to chown directory tree")
 }
 
 func (fs *Filesystem) Chtimes(path string, atime, mtime time.Time) error {

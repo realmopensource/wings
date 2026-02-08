@@ -98,11 +98,12 @@ func (fs *Filesystem) File(p string) (*os.File, Stat, error) {
 }
 
 // Touch acts by creating the given file and path on the disk if it is not present
-// already. If  it is present, the file is opened using the defaults which will truncate
+// already. If it is present, the file is opened using the defaults which will truncate
 // the contents. The opened file is then returned to the caller.
-func (fs *Filesystem) Touch(p string, flag int) (*os.File, error) {
+func (fs *Filesystem) Touch(p string, flag int, perm os.FileMode) (*os.File, error) {
 	p = normalize(p)
-	f, err := fs.root.OpenFile(p, flag, 0o644)
+	o := &fileOpener{root: fs.root}
+	f, err := o.open(p, flag, perm)
 	if err == nil {
 		return f, nil
 	}
@@ -118,18 +119,17 @@ func (fs *Filesystem) Touch(p string, flag int) (*os.File, error) {
 		// Create the path leading up to the file we're trying to create, setting the final perms
 		// on it as we go.
 		if err := fs.root.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			return nil, errors.Wrap(err, "server/filesystem: touch: failed to create directory tree")
+			return nil, errors.WrapIf(err, "server/filesystem: touch: failed to create directory tree")
 		}
 		if err := fs.Chown(filepath.Dir(p)); err != nil {
-			return nil, errors.Wrap(err, "server/filesystem: touch: failed to chown directory tree")
+			return nil, errors.WrapIf(err, "server/filesystem: touch: failed to chown directory tree")
 		}
 	}
-	o := &fileOpener{root: fs.root}
 	// Try to open the file now that we have created the pathing necessary for it, and then
 	// Chown that file so that the permissions don't mess with things.
-	f, err = o.open(p, flag, 0o644)
+	f, err = o.open(p, flag, perm)
 	if err != nil {
-		return nil, errors.Wrap(err, "server/filesystem: touch: failed to open file with wait")
+		return nil, errors.Wrap(err, "server/filesystem: touch: failed to open file handle")
 	}
 	_ = fs.Chown(p)
 	return f, nil
@@ -163,7 +163,7 @@ func (fs *Filesystem) Writefile(p string, r io.Reader) error {
 
 	// Touch the file and return the handle to it at this point. This will create the file,
 	// any necessary directories, and set the proper owner of the file.
-	file, err := fs.Touch(p, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
+	file, err := fs.Touch(p, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
 		return err
 	}

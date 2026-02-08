@@ -1,6 +1,7 @@
 package server
 
 import (
+	"os"
 	"runtime"
 
 	"github.com/gammazero/workerpool"
@@ -10,26 +11,24 @@ import (
 // a server automatically to ensure that they always use the specified values.
 func (s *Server) UpdateConfigurationFiles() {
 	pool := workerpool.New(runtime.NumCPU())
-
-	s.Log().Debug("acquiring process configuration files...")
 	files := s.ProcessConfiguration().ConfigurationFiles
-	s.Log().Debug("acquired process configuration files")
+
 	for _, cf := range files {
 		f := cf
 
 		pool.Submit(func() {
-			p, err := s.Filesystem().SafePath(f.FileName)
+			fd, err := s.Filesystem().Touch(f.FileName, os.O_RDWR|os.O_CREATE, 0o644)
 			if err != nil {
-				s.Log().WithField("error", err).Error("failed to generate safe path for configuration file")
-
+				s.Log().WithField("file_name", f.FileName).WithField("error", err).Error("failed to open configuration file")
 				return
 			}
+			defer fd.Close()
 
-			if err := f.Parse(p, false); err != nil {
-				s.Log().WithField("error", err).Error("failed to parse and update server configuration file")
+			if err := f.Parse(fd); err != nil {
+				s.Log().WithField("error", err).WithField("file_name", f.FileName).Error("failed to parse and update server configuration file")
 			}
 
-			s.Log().WithField("path", f.FileName).Debug("finished processing server configuration file")
+			s.Log().WithField("file_name", f.FileName).Debug("finished processing server configuration file")
 		})
 	}
 
