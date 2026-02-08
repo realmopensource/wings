@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"emperror.dev/errors"
+	"github.com/apex/log"
 	"github.com/gabriel-vasile/mimetype"
 	ignore "github.com/sabhiram/go-gitignore"
 
@@ -418,11 +419,12 @@ func (fs *Filesystem) ListDirectory(p string) ([]Stat, error) {
 	for i, file := range files {
 		wg.Add(1)
 
-		go func(idx int, f fs2.DirEntry) {
+		go func(idx int, d fs2.DirEntry) {
 			defer wg.Done()
 
-			fi, err := f.Info()
+			fi, err := d.Info()
 			if err != nil {
+				log.WithField("error", err).WithField("path", filepath.Join(p, d.Name())).Warn("failed to retrieve directory entry info")
 				return
 			}
 
@@ -438,13 +440,13 @@ func (fs *Filesystem) ListDirectory(p string) ([]Stat, error) {
 			//
 			// @see https://github.com/pterodactyl/panel/issues/4059
 			if fi.Mode()&os.ModeNamedPipe == 0 {
-				f, err := fs.root.Open(filepath.Join(p, f.Name()))
-				if err != nil {
-					return
-				}
-				defer f.Close()
-				if m, err := mimetype.DetectReader(f); err != nil {
-					st.Mimetype = m.String()
+				if f, err := fs.root.Open(normalize(filepath.Join(p, d.Name()))); err != nil {
+					log.WithField("error", err).WithField("path", filepath.Join(p, d.Name())).Warn("error opening file for mimetype detection")
+				} else {
+					if m, err := mimetype.DetectReader(f); err != nil {
+						st.Mimetype = m.String()
+					}
+					_ = f.Close()
 				}
 			}
 
