@@ -467,6 +467,88 @@ func TestFilesystem_Copy(t *testing.T) {
 	})
 }
 
+func TestFilesystem_Symlink(t *testing.T) {
+	g := Goblin(t)
+	fs := NewFs()
+
+	g.Describe("Symlink", func() {
+		g.It("should create a symlink", func() {
+			fs.write("source.txt", []byte("text content"))
+
+			err := fs.Symlink("source.txt", "symlink.txt")
+			g.Assert(err).IsNil()
+
+			st, err := os.Lstat(filepath.Join(fs.rootPath, "symlink.txt"))
+			g.Assert(err).IsNil()
+			g.Assert(st.Mode()&os.ModeSymlink != 0).IsTrue()
+		})
+
+		g.It("should return an error if the source is outside the root", func() {
+			err := fs.Symlink("../source.txt", "symlink.txt")
+			g.Assert(err).IsNotNil()
+			g.Assert(IsPathError(err)).IsTrue()
+		})
+
+		g.It("should return an error if the dest is outside the root", func() {
+			fs.write("source.txt", []byte("text content"))
+
+			err := fs.Symlink("source.txt", "../symlink.txt")
+			g.Assert(err).IsNotNil()
+			g.Assert(IsLinkError(err)).IsTrue()
+		})
+
+		g.AfterEach(func() {
+			fs.reset()
+		})
+	})
+}
+
+func TestFilesystem_ReadDir(t *testing.T) {
+	g := Goblin(t)
+	fs := NewFs()
+
+	g.Describe("ReadDir", func() {
+		g.Before(func() {
+			if err := os.Mkdir(filepath.Join(fs.rootPath, "child"), 0o755); err != nil {
+				panic(err)
+			}
+
+			fs.write("one.txt", []byte("one"))
+			fs.write("two.txt", []byte("two"))
+			fs.write("child/three.txt", []byte("two"))
+		})
+
+		g.After(func() {
+			fs.reset()
+		})
+
+		g.It("should return the contents of the root directory", func() {
+			d, err := fs.ReadDir("/")
+			g.Assert(err).IsNil()
+			g.Assert(len(d)).Equal(3)
+
+			// os.Root#ReadDir sorts them by name.
+			g.Assert(d[0].Name()).Equal("child")
+			g.Assert(d[0].IsDir()).IsTrue()
+			g.Assert(d[1].Name()).Equal("one.txt")
+			g.Assert(d[2].Name()).Equal("two.txt")
+		})
+
+		g.It("should return the contents of a child directory", func() {
+			d, err := fs.ReadDir("child")
+			g.Assert(err).IsNil()
+			g.Assert(len(d)).Equal(1)
+			g.Assert(d[0].Name()).Equal("three.txt")
+		})
+
+		g.It("should return an error if the directory is outside the root", func() {
+			_, err := fs.ReadDir("../server")
+			g.Assert(err).IsNotNil()
+			g.Assert(IsPathError(err)).IsTrue()
+		})
+	})
+}
+
 func TestFilesystem_Delete(t *testing.T) {
 	g := Goblin(t)
 	fs := NewFs()

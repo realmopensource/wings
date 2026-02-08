@@ -3,7 +3,7 @@ package filesystem
 import (
 	"bufio"
 	"io"
-	"io/ioutil"
+	fs2 "io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -59,6 +59,18 @@ func New(path string, size int64, denylist []string) (*Filesystem, error) {
 	return fs, nil
 }
 
+// normalize takes the input path, runs it through filepath.Clean and trims any
+// leading forward slashes (since the os.Root method calls will fail otherwise).
+// If the resulting path is an empty string, "." is returned which os.Root will
+// understand as the base directory.
+func normalize(path string) string {
+	c := strings.TrimLeft(filepath.Clean(path), "/")
+	if c == "" {
+		return "."
+	}
+	return c
+}
+
 // Path returns the root path for the Filesystem instance.
 func (fs *Filesystem) Path() string {
 	return fs.rootPath
@@ -66,7 +78,7 @@ func (fs *Filesystem) Path() string {
 
 // File returns a reader for a file instance as well as the stat information.
 func (fs *Filesystem) File(p string) (*os.File, Stat, error) {
-	p = strings.TrimLeft(filepath.Clean(p), "/")
+	p = normalize(p)
 	st, err := fs.Stat(p)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -88,7 +100,7 @@ func (fs *Filesystem) File(p string) (*os.File, Stat, error) {
 // already. If  it is present, the file is opened using the defaults which will truncate
 // the contents. The opened file is then returned to the caller.
 func (fs *Filesystem) Touch(p string, flag int) (*os.File, error) {
-	p = strings.TrimLeft(filepath.Clean(p), "/")
+	p = normalize(p)
 	f, err := fs.root.OpenFile(p, flag, 0o644)
 	if err == nil {
 		return f, nil
@@ -126,7 +138,7 @@ func (fs *Filesystem) Touch(p string, flag int) (*os.File, error) {
 // will be created. This will also properly recalculate the disk space used by
 // the server when writing new files or modifying existing ones.
 func (fs *Filesystem) Writefile(p string, r io.Reader) error {
-	p = strings.TrimLeft(filepath.Clean(p), "/")
+	p = normalize(p)
 	var currentSize int64
 	// If the file does not exist on the system already go ahead and create the pathway
 	// to it and an empty file. We'll then write to it later on after this completes.
@@ -167,16 +179,15 @@ func (fs *Filesystem) Writefile(p string, r io.Reader) error {
 
 // CreateDirectory creates a new directory ("name") at a specified path ("p") for the server.
 func (fs *Filesystem) CreateDirectory(name string, p string) error {
-	p = strings.TrimLeft(filepath.Clean(p), "/")
-	return fs.root.MkdirAll(path.Join(p, name), 0o755)
+	return fs.root.MkdirAll(path.Join(normalize(p), name), 0o755)
 }
 
 // Rename moves (or renames) a file or directory.
 func (fs *Filesystem) Rename(from string, to string) error {
-	to = strings.TrimLeft(filepath.Clean(to), "/")
-	from = strings.TrimLeft(filepath.Clean(from), "/")
+	to = normalize(to)
+	from = normalize(from)
 
-	if from == "" || to == "" {
+	if from == "." || to == "." {
 		return os.ErrExist
 	}
 
@@ -237,7 +248,7 @@ func (fs *Filesystem) findCopySuffix(dir string, name string, extension string) 
 // Copies a given file to the same location and appends a suffix to the file to indicate that
 // it has been copied.
 func (fs *Filesystem) Copy(p string) error {
-	p = strings.TrimLeft(filepath.Clean(p), "/")
+	p = normalize(p)
 	s, err := fs.root.Stat(p)
 	if err != nil {
 		return err
@@ -279,6 +290,52 @@ func (fs *Filesystem) Copy(p string) error {
 	return fs.Writefile(path.Join(relative, n), source)
 }
 
+// Symlink creates a symbolic link between the source and target paths.
+func (fs *Filesystem) Symlink(source, target string) error {
+	source = normalize(source)
+	target = normalize(target)
+
+	// os.Root#Symlink allows for the creation of a symlink that targets a file outside
+	// the root directory. This isn't the end of the world because the read is blocked
+	// through this system, and within a container it would just point to something in the
+	// readonly filesystem.
+	//
+	// However, just to avoid this propagating everywhere, *attempt* to block anything that
+	// would be pointing to a location outside the root directory.
+	if _, err := fs.root.Stat(source); err != nil {
+		return errors.Wrap(err, "server/filesystem: symlink: failed to stat source")
+	}
+
+	// Yes -- this gap between the stat and symlink allows a TOCTOU vulnerability to exist,
+	// but again we're layering this with the remaining logic that prevents this filesystem
+	// from reading any symlinks or acting on any file that points outside the root as defined
+	// by os.Root. The check above is mostly to prevent stupid mistakes or basic attempts to
+	// get around this. If someone *really* wants to make these symlinks, they can. They can
+	// also just create them from the running server process, and we still need to rely on our
+	// own internal FS logic to detect and block those reads, which it does. Therefore, I am
+	// not deeply concerned with this.
+	if err := fs.root.Symlink(source, target); err != nil {
+		return errors.Wrap(err, "server/filesystem: symlink: failed to create symlink")
+	}
+
+	return nil
+}
+
+// ReadDir returns all the contents of the given directory.
+func (fs *Filesystem) ReadDir(p string) ([]fs2.DirEntry, error) {
+	d, ok := fs.root.FS().(fs2.ReadDirFS)
+	if !ok {
+		return []fs2.DirEntry{}, errors.New("server/filesystem: readdir: could not init root fs")
+	}
+
+	e, err := d.ReadDir(normalize(p))
+	if err != nil {
+		return []fs2.DirEntry{}, errors.Wrap(err, "server/filesystem: readdir: failed to read directory")
+	}
+
+	return e, nil
+}
+
 // TruncateRootDirectory removes _all_ files and directories from a server's
 // data directory and resets the used disk space to zero.
 func (fs *Filesystem) TruncateRootDirectory() error {
@@ -288,8 +345,8 @@ func (fs *Filesystem) TruncateRootDirectory() error {
 // Delete removes a file or folder from the system. Prevents the user from
 // accidentally (or maliciously) removing their root server data directory.
 func (fs *Filesystem) Delete(p string) error {
-	p = strings.TrimLeft(filepath.Clean(p), "/")
-	if p == "" {
+	p = normalize(p)
+	if p == "." {
 		return errors.New("server/filesystem: delete: cannot delete root directory")
 	}
 
@@ -339,17 +396,14 @@ func (fo *fileOpener) open(path string, flags int, perm os.FileMode) (*os.File, 
 	}
 }
 
-// ListDirectory lists the contents of a given directory and returns stat
-// information about each file and folder within it.
+// ListDirectory lists the contents of a given directory and returns stat information
+// about each file and folder within it. If you only need to know the contents of the
+// directory and do not need mimetype information, call [Filesystem.ReadDir] directly
+// instead.
 func (fs *Filesystem) ListDirectory(p string) ([]Stat, error) {
-	cleaned, err := fs.SafePath(p)
+	files, err := fs.ReadDir(p)
 	if err != nil {
-		return nil, err
-	}
-
-	files, err := ioutil.ReadDir(cleaned)
-	if err != nil {
-		return nil, err
+		return []Stat{}, err
 	}
 
 	var wg sync.WaitGroup
@@ -359,39 +413,41 @@ func (fs *Filesystem) ListDirectory(p string) ([]Stat, error) {
 	// break the panel badly.
 	out := make([]Stat, len(files))
 
-	// Iterate over all of the files and directories returned and perform an async process
+	// Iterate over all the files and directories returned and perform an async process
 	// to get the mime-type for them all.
 	for i, file := range files {
 		wg.Add(1)
 
-		go func(idx int, f os.FileInfo) {
+		go func(idx int, f fs2.DirEntry) {
 			defer wg.Done()
 
-			var m *mimetype.MIME
-			d := "inode/directory"
-			if !f.IsDir() {
-				cleanedp := filepath.Join(cleaned, f.Name())
-				if f.Mode()&os.ModeSymlink != 0 {
-					cleanedp, _ = fs.SafePath(filepath.Join(cleaned, f.Name()))
-				}
+			fi, err := f.Info()
+			if err != nil {
+				return
+			}
 
-				// Don't try to detect the type on a pipe — this will just hang the application and
-				// you'll never get a response back.
-				//
-				// @see https://github.com/pterodactyl/panel/issues/4059
-				if cleanedp != "" && f.Mode()&os.ModeNamedPipe == 0 {
-					m, _ = mimetype.DetectFile(filepath.Join(cleaned, f.Name()))
-				} else {
-					// Just pass this for an unknown type because the file could not safely be resolved within
-					// the server data path.
-					d = "application/octet-stream"
+			if fi.IsDir() {
+				out[idx] = Stat{FileInfo: fi, Mimetype: "inode/directory"}
+				return
+			}
+
+			st := Stat{FileInfo: fi, Mimetype: "application/octet-stream"}
+
+			// Don't try to detect the type on a pipe — this will just hang the application,
+			// and you'll never get a response back.
+			//
+			// @see https://github.com/pterodactyl/panel/issues/4059
+			if fi.Mode()&os.ModeNamedPipe == 0 {
+				f, err := fs.root.Open(filepath.Join(p, f.Name()))
+				if err != nil {
+					return
+				}
+				defer f.Close()
+				if m, err := mimetype.DetectReader(f); err != nil {
+					st.Mimetype = m.String()
 				}
 			}
 
-			st := Stat{FileInfo: f, Mimetype: d}
-			if m != nil {
-				st.Mimetype = m.String()
-			}
 			out[idx] = st
 		}(i, file)
 	}

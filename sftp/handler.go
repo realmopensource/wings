@@ -2,7 +2,6 @@ package sftp
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -214,22 +213,12 @@ func (h *Handler) Filecmd(request *sftp.Request) error {
 		}
 		h.events.MustLog(server.ActivitySftpCreateDirectory, FileAction{Entity: request.Filepath})
 		break
-	// Support creating symlinks between files. The source and target must resolve within
-	// the server home directory.
 	case "Symlink":
 		if !h.can(PermissionFileCreate) {
 			return sftp.ErrSSHFxPermissionDenied
 		}
-		source, err := h.fs.SafePath(request.Filepath)
-		if err != nil {
-			return sftp.ErrSSHFxNoSuchFile
-		}
-		target, err := h.fs.SafePath(request.Target)
-		if err != nil {
-			return sftp.ErrSSHFxNoSuchFile
-		}
-		if err := os.Symlink(source, target); err != nil {
-			l.WithField("target", target).WithField("error", err).Error("failed to create symlink")
+		if err := h.fs.Symlink(request.Filepath, request.Target); err != nil {
+			l.WithField("target", request.Target).WithField("error", err).Error("failed to create symlink")
 			return sftp.ErrSSHFxFailure
 		}
 		break
@@ -274,18 +263,23 @@ func (h *Handler) Filelist(request *sftp.Request) (sftp.ListerAt, error) {
 
 	switch request.Method {
 	case "List":
-		p, err := h.fs.SafePath(request.Filepath)
+		d, err := h.fs.ReadDir(request.Filepath)
 		if err != nil {
-			return nil, sftp.ErrSSHFxNoSuchFile
-		}
-		files, err := ioutil.ReadDir(p)
-		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil, sftp.ErrSSHFxNoSuchFile
+			}
 			h.logger.WithField("source", request.Filepath).WithField("error", err).Error("error while listing directory")
 			return nil, sftp.ErrSSHFxFailure
 		}
+		files := make([]os.FileInfo, len(d))
+		for _, entry := range d {
+			if i, err := entry.Info(); err == nil {
+				files = append(files, i)
+			}
+		}
 		return ListerAt(files), nil
 	case "Stat":
-		st, err := h.fs.Stat(request.Filepath)
+		st, err := h.fs.Stat2(request.Filepath)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
 				return nil, sftp.ErrSSHFxNoSuchFile
@@ -293,7 +287,7 @@ func (h *Handler) Filelist(request *sftp.Request) (sftp.ListerAt, error) {
 			h.logger.WithField("source", request.Filepath).WithField("error", err).Error("error performing stat on file")
 			return nil, sftp.ErrSSHFxFailure
 		}
-		return ListerAt([]os.FileInfo{st.FileInfo}), nil
+		return ListerAt([]os.FileInfo{st}), nil
 	default:
 		return nil, sftp.ErrSSHFxOpUnsupported
 	}

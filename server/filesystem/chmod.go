@@ -13,6 +13,9 @@ import (
 
 func (fs *Filesystem) Chmod(path string, mode os.FileMode) error {
 	path = strings.TrimLeft(filepath.Clean(path), "/")
+	if path == "" {
+		path = "."
+	}
 	if err := fs.root.Chmod(path, mode); err != nil {
 		return errors.Wrap(err, "server/filesystem: chmod: failed to chmod path")
 	}
@@ -24,22 +27,14 @@ func (fs *Filesystem) Chmod(path string, mode os.FileMode) error {
 // underlying files. Iterate over all the files and directories. If it is a file go ahead
 // and perform the chown operation. Otherwise dig deeper into the directory until we've run
 // out of directories to dig into.
-//
-// todo: insecure function due to walking on uncontrolled path
 func (fs *Filesystem) Chown(path string) error {
 	path = strings.TrimLeft(filepath.Clean(path), "/")
+	if path == "" {
+		path = "."
+	}
 
 	uid := config.Get().System.User.Uid
 	gid := config.Get().System.User.Gid
-
-	if path == "" {
-		if err := os.Chown(fs.rootPath, uid, gid); err != nil {
-			return errors.Wrap(err, "server/filesystem: chown: failed to chown root directory")
-		}
-
-		return nil
-	}
-
 	if err := fs.root.Chown(path, uid, gid); err != nil {
 		return errors.Wrap(err, "server/filesystem: chown: failed to chown path")
 	}

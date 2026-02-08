@@ -2,9 +2,7 @@ package filesystem
 
 import (
 	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"emperror.dev/errors"
@@ -47,7 +45,7 @@ func (s *Stat) MarshalJSON() ([]byte, error) {
 // Stat stats a file or folder and returns the base stat object from go along
 // with the MIME data that can be used for editing files.
 func (fs *Filesystem) Stat(p string) (Stat, error) {
-	p = strings.TrimLeft(filepath.Clean(p), "/")
+	p = normalize(p)
 	s, err := fs.root.Stat(p)
 	if err != nil {
 		return Stat{}, errors.Wrap(err, "server/filesystem: stat: failed to stat file")
@@ -74,5 +72,13 @@ func (fs *Filesystem) Stat(p string) (Stat, error) {
 		st.Mimetype = m.String()
 	}
 
+	return st, nil
+}
+
+func (fs *Filesystem) Stat2(p string) (os.FileInfo, error) {
+	st, err := fs.root.Stat(normalize(p))
+	if err != nil {
+		return st, errors.Wrap(err, "server/filesystem: stat2: failed to stat file")
+	}
 	return st, nil
 }
