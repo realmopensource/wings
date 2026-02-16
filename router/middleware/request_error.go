@@ -118,7 +118,6 @@ func (re *RequestError) asFilesystemError() (int, string) {
 		return 0, ""
 	}
 	if filesystem.IsErrorCode(err, filesystem.ErrNotExist) ||
-		filesystem.IsErrorCode(err, filesystem.ErrCodePathResolution) ||
 		filesystem.IsPathError(err) ||
 		filesystem.IsLinkError(err) {
 		return http.StatusNotFound, "The requested file or folder does not exist on the system."
