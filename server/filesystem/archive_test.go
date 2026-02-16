@@ -23,13 +23,9 @@ func TestArchive_Stream(t *testing.T) {
 		})
 
 		g.It("throws an error when passed invalid file paths", func() {
-			a := &Archive{
-				BasePath: fs.Path(),
-				Files: []string{
-					// To use the archiver properly, this needs to be filepath.Join(BasePath, "yeet")
-					// However, this test tests that we actually validate that behavior.
-					"yeet",
-				},
+			a, err := NewArchive(fs.root, nil, WithMatching([]string{"yeet"}))
+			if err != nil {
+				panic(err)
 			}
 
 			g.Assert(a.Create(context.Background(), "")).IsNotNil()
@@ -51,13 +47,7 @@ func TestArchive_Stream(t *testing.T) {
 			err = fs.Writefile("test_file.txt.old", strings.NewReader("hello, world!\n"))
 			g.Assert(err).IsNil()
 
-			a := &Archive{
-				BasePath: fs.Path(),
-				Files: []string{
-					filepath.Join(fs.Path(), "test"),
-					filepath.Join(fs.Path(), "test_file.txt"),
-				},
-			}
+			a, err := NewArchive(fs.root, nil, WithMatching([]string{"test", "test_file.txt"}))
 
 			// Create the archive.
 			archivePath := filepath.Join(fs.rootPath, "../archive.tar.gz")
@@ -91,6 +81,49 @@ func TestArchive_Stream(t *testing.T) {
 			sort.Strings(files)
 
 			g.Assert(files).Equal(expected)
+		})
+
+		g.It("does not archive files outside of root", func() {
+			if err := os.MkdirAll(filepath.Join(fs.rootPath, "../outer"), 0o755); err != nil {
+				panic(err)
+			}
+
+			fs.write("test.txt", []byte("test"))
+			fs.write("../danger-1.txt", []byte("danger"))
+			fs.write("../outer/danger-2.txt", []byte("danger"))
+
+			if err := os.Symlink("../danger-1.txt", filepath.Join(fs.rootPath, "symlink.txt")); err != nil {
+				panic(err)
+			}
+
+			if err := os.Symlink("../outer", filepath.Join(fs.rootPath, "danger-dir")); err != nil {
+				panic(err)
+			}
+
+			a, err := NewArchive(fs.root, nil)
+			if err != nil {
+				panic(err)
+			}
+
+			archivePath := filepath.Join(fs.rootPath, "../archive.tar.gz")
+			err = a.Create(context.Background(), archivePath)
+			g.Assert(err).IsNil()
+
+			// Open the archive.
+			genericFs, err := archives.FileSystem(context.Background(), archivePath, nil)
+			g.Assert(err).IsNil()
+
+			// Assert that we are opening an archive.
+			afs, ok := genericFs.(iofs.ReadDirFS)
+			g.Assert(ok).IsTrue()
+
+			// Get the names of the files recursively from the archive.
+			files, err := getFiles(afs, ".")
+			g.Assert(err).IsNil()
+			// We expect the actual symlinks themselves, but not the contents of the directory
+			// or the file itself. We're storing the symlinked file in the archive so that
+			// expanding it back is the same, but you won't have the inner contents.
+			g.Assert(files).Equal([]string{"danger-dir", "symlink.txt", "test.txt"})
 		})
 	})
 }

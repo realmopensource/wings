@@ -65,7 +65,7 @@ func New(path string, size int64, denylist []string) (*Filesystem, error) {
 // If the resulting path is an empty string, "." is returned which os.Root will
 // understand as the base directory.
 func normalize(path string) string {
-	c := strings.TrimLeft(filepath.Clean(path), "/")
+	c := strings.TrimLeft(filepath.Clean(path), string(filepath.Separator))
 	if c == "" {
 		return "."
 	}

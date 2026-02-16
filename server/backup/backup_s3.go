@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"emperror.dev/errors"
@@ -51,24 +52,34 @@ func (s *S3Backup) WithLogContext(c map[string]interface{}) {
 func (s *S3Backup) Generate(ctx context.Context, basePath, ignore string) (*ArchiveDetails, error) {
 	defer s.Remove()
 
-	a := &filesystem.Archive{
-		BasePath: basePath,
-		Ignore:   ignore,
+	r, err := os.OpenRoot(basePath)
+	if err != nil {
+		return nil, errors.Wrap(err, "backup: failed to open root directory")
 	}
+	a, err := filesystem.NewArchive(r, nil, filesystem.WithIgnored(strings.Split(ignore, "\n")))
+	if err != nil {
+		_ = r.Close()
+		return nil, errors.WrapIf(err, "backup: failed to create archive")
+	}
+	defer a.Close()
 
 	s.log().WithField("path", s.Path()).Info("creating backup for server")
-	if err := a.Create(ctx, s.Path()); err != nil {
+	f, err := os.OpenFile(s.Path(), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return nil, errors.Wrap(err, "backup: failed to open file for writing")
+	}
+	defer f.Close()
+	if err := a.Create(ctx, f); err != nil {
 		return nil, err
 	}
 	s.log().Info("created backup successfully")
 
-	rc, err := os.Open(s.Path())
-	if err != nil {
-		return nil, errors.Wrap(err, "backup: could not read archive from disk")
+	_ = f.Sync()
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, errors.Wrap(err, "backup: failed to seek on file")
 	}
-	defer rc.Close()
 
-	parts, err := s.generateRemoteRequest(ctx, rc)
+	parts, err := s.generateRemoteRequest(ctx, f)
 	if err != nil {
 		return nil, err
 	}

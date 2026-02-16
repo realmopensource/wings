@@ -422,7 +422,7 @@ func postServerCompressFiles(c *gin.Context) {
 		return
 	}
 
-	f, err := s.Filesystem().CompressFiles(data.RootPath, data.Files)
+	f, err := s.Filesystem().CompressFiles(c.Request.Context(), data.RootPath, data.Files)
 	if err != nil {
 		middleware.CaptureAndAbort(c, err)
 		return

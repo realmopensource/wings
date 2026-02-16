@@ -2,8 +2,11 @@ package filesystem
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"strings"
+	"time"
 
 	"emperror.dev/errors"
 )
@@ -12,13 +15,36 @@ import (
 // specified directory. This function also supports passing nested paths to only
 // compress certain files and folders when working in a larger directory. This
 // effectively creates a local backup, but rather than ignoring specific files
-// and folders, it takes an allow-list of files and folders.
+// and folders, it takes an allowlist of files and folders.
 //
 // All paths are relative to the dir that is passed in as the first argument,
 // and the compressed file will be placed at that location named
 // `archive-{date}.tar.gz`.
-func (fs *Filesystem) CompressFiles(dir string, paths []string) (os.FileInfo, error) {
-	return nil, errors.New("server/fs: not implemented")
+func (fs *Filesystem) CompressFiles(ctx context.Context, dir string, paths []string) (os.FileInfo, error) {
+	r, err := fs.root.OpenRoot(normalize(dir))
+	if err != nil {
+		return nil, errors.Wrap(err, "server/filesystem: compress: failed to open root directory")
+	}
+	a, err := NewArchive(r, nil, WithMatching(paths))
+	if err != nil {
+		_ = r.Close()
+		return nil, errors.WrapIf(err, "server/filesystem: compress: failed to create archive instance")
+	}
+	defer a.Close()
+
+	n := fmt.Sprintf("archive-%s.tar.gz", strings.ReplaceAll(time.Now().Format(time.RFC3339), ":", ""))
+	f, err := r.OpenFile(n, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return nil, errors.Wrap(err, "server/filesystem: compress: failed to open file for writing")
+	}
+	defer f.Close()
+
+	if err := a.Create(ctx, f); err != nil {
+		return nil, errors.Wrap(err, "server/filesystem: compress: failed to write to disk")
+	}
+
+	// todo: disk space
+	return f.Stat()
 }
 
 // SpaceAvailableForDecompression looks through a given archive and determines
