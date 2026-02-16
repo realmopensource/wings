@@ -100,10 +100,10 @@ func (fs *Filesystem) File(p string) (*os.File, Stat, error) {
 // Touch acts by creating the given file and path on the disk if it is not present
 // already. If it is present, the file is opened using the defaults which will truncate
 // the contents. The opened file is then returned to the caller.
-func (fs *Filesystem) Touch(p string, flag int, perm os.FileMode) (*os.File, error) {
+func (fs *Filesystem) Touch(p string, flag int, mode os.FileMode) (*os.File, error) {
 	p = normalize(p)
 	o := &fileOpener{root: fs.root}
-	f, err := o.open(p, flag, perm)
+	f, err := o.open(p, flag, mode)
 	if err == nil {
 		return f, nil
 	}
@@ -127,7 +127,7 @@ func (fs *Filesystem) Touch(p string, flag int, perm os.FileMode) (*os.File, err
 	}
 	// Try to open the file now that we have created the pathing necessary for it, and then
 	// Chown that file so that the permissions don't mess with things.
-	f, err = o.open(p, flag, perm)
+	f, err = o.open(p, flag, mode)
 	if err != nil {
 		return nil, errors.Wrap(err, "server/filesystem: touch: failed to open file handle")
 	}
@@ -138,6 +138,8 @@ func (fs *Filesystem) Touch(p string, flag int, perm os.FileMode) (*os.File, err
 // Writefile writes a file to the system. If the file does not already exist one
 // will be created. This will also properly recalculate the disk space used by
 // the server when writing new files or modifying existing ones.
+//
+// deprecated 1.12.1 prefer the use of Filesystem.Write()
 func (fs *Filesystem) Writefile(p string, r io.Reader) error {
 	p = normalize(p)
 	var currentSize int64
@@ -175,6 +177,51 @@ func (fs *Filesystem) Writefile(p string, r io.Reader) error {
 	// Adjust the disk usage to account for the old size and the new size of the file.
 	fs.addDisk(sz - currentSize)
 
+	return fs.Chown(p)
+}
+
+// Write writes a file to the disk.
+func (fs *Filesystem) Write(p string, r io.Reader, newSize int64, mode os.FileMode) error {
+	st, err := fs.root.Stat(normalize(p))
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return errors.Wrap(err, "server/filesystem: write: failed to stat file")
+		}
+	}
+
+	var c int64
+	if err == nil {
+		if st.IsDir() {
+			return errors.WithStack(&Error{code: ErrCodeIsDirectory, resolved: ""})
+		}
+		c = st.Size()
+	}
+
+	if err := fs.HasSpaceFor(newSize - c); err != nil {
+		return err
+	}
+
+	f, err := fs.Touch(p, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode)
+	if err != nil {
+		return errors.Wrap(err, "server/filesystem: write: failed to touch file")
+	}
+	defer f.Close()
+
+	if newSize == 0 {
+		fs.addDisk(-c)
+	} else {
+		// Do not use CopyBuffer here; it is wasteful as the file implements
+		// io.ReaderFrom, which causes it to not use the buffer anyway.
+		n, err := io.Copy(f, io.LimitReader(r, newSize))
+		// Always adjust the disk to account for cases where a partial copy occurs
+		// and there is some new content on the disk.
+		fs.addDisk(n - c)
+		if err != nil {
+			return errors.Wrap(err, "server/filesystem: write: failed to write file")
+		}
+	}
+
+	// todo: might be unnecessary due to the `fs.Touch` call already doing this?
 	return fs.Chown(p)
 }
 
@@ -378,9 +425,9 @@ type fileOpener struct {
 // Attempts to open a given file up to "attempts" number of times, using a backoff. If the file
 // cannot be opened because of a "text file busy" error, we will attempt until the number of attempts
 // has been exhaused, at which point we will abort with an error.
-func (fo *fileOpener) open(path string, flags int, perm os.FileMode) (*os.File, error) {
+func (fo *fileOpener) open(path string, flags int, mode os.FileMode) (*os.File, error) {
 	for {
-		f, err := fo.root.OpenFile(path, flags, perm)
+		f, err := fo.root.OpenFile(path, flags, mode)
 
 		// If there is an error because the text file is busy, go ahead and sleep for a few
 		// hundred milliseconds and then try again up to three times before just returning the

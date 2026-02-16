@@ -5,11 +5,20 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"emperror.dev/errors"
+	"github.com/mholt/archives"
 )
+
+type extractOptions struct {
+	dir    string
+	file   string
+	format archives.Format
+	r      io.Reader
+}
 
 // CompressFiles compresses all the files matching the given paths in the
 // specified directory. This function also supports passing nested paths to only
@@ -50,6 +59,10 @@ func (fs *Filesystem) CompressFiles(ctx context.Context, dir string, paths []str
 // SpaceAvailableForDecompression looks through a given archive and determines
 // if decompressing it would put the server over its allocated disk space limit.
 func (fs *Filesystem) SpaceAvailableForDecompression(ctx context.Context, dir string, file string) error {
+	if fs.MaxDisk() <= 0 {
+		return nil
+	}
+
 	return nil
 }
 
@@ -59,7 +72,114 @@ func (fs *Filesystem) SpaceAvailableForDecompression(ctx context.Context, dir st
 // zip-slip attack being attempted by validating that the final path is within
 // the server data directory.
 func (fs *Filesystem) DecompressFile(ctx context.Context, dir string, file string) error {
-	return errors.New("server/fs: not implemented")
+	f, err := fs.root.Open(normalize(filepath.Join(dir, file)))
+	if err != nil {
+		return errors.Wrap(err, "server/filesystem: decompress: failed to open file")
+	}
+	defer f.Close()
+
+	format, input, err := archives.Identify(ctx, filepath.Base(file), f)
+	if err != nil {
+		if errors.Is(err, archives.NoMatch) {
+			return newFilesystemError(ErrCodeUnknownArchive, err)
+		}
+		return errors.Wrap(err, "server/filesystem: decompress: failed to identify archive format")
+	}
+
+	return fs.extractStream(ctx, extractOptions{dir: dir, file: file, format: format, r: input})
+}
+
+func (fs *Filesystem) extractStream(ctx context.Context, opts extractOptions) error {
+	// See if it's a compressed archive, such as TAR or a ZIP
+	ex, ok := opts.format.(archives.Extractor)
+	if !ok {
+		// If not, check if it's a single-file compression, such as
+		// .log.gz, .sql.gz, and so on
+		de, ok := opts.format.(archives.Decompressor)
+		if !ok {
+			return nil
+		}
+
+		p := filepath.Join(opts.dir, strings.TrimSuffix(opts.file, opts.format.Extension()))
+		if err := fs.IsIgnored(p); err != nil {
+			return nil
+		}
+
+		reader, err := de.OpenReader(opts.r)
+		if err != nil {
+			return errors.Wrap(err, "server/filesystem: decompress: failed to open reader")
+		}
+		defer reader.Close()
+
+		// Open the file for creation/writing
+		fmt.Println("open file", normalize(p), p)
+		f, err := fs.root.OpenFile(normalize(p), os.O_WRONLY|os.O_CREATE, 0o644)
+		if err != nil {
+			return errors.Wrap(err, "server/filesystem: decompress: failed to open file")
+		}
+		defer f.Close()
+
+		// Read in 4 KB chunks
+		buf := make([]byte, 4096)
+		for {
+			n, err := reader.Read(buf)
+			if n > 0 {
+				if err := fs.HasSpaceFor(int64(n)); err != nil {
+					return err
+				}
+				if _, err := f.Write(buf[:n]); err != nil {
+					return errors.Wrap(err, "server/filesystem: decompress: failed to write")
+				}
+				fs.addDisk(int64(n))
+			}
+
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				return errors.Wrap(err, "server/filesystem: decompress: failed to read")
+			}
+		}
+
+		return nil
+	}
+
+	// Decompress and extract archive
+	return ex.Extract(ctx, opts.r, func(ctx context.Context, f archives.FileInfo) error {
+		if f.IsDir() {
+			return nil
+		}
+		p := filepath.Join(opts.dir, f.NameInArchive)
+		if err := fs.IsIgnored(p); err != nil {
+			return nil
+		}
+		r, err := f.Open()
+		if err != nil {
+			return err
+		}
+		defer r.Close()
+		if f.Mode()&os.ModeSymlink != 0 {
+			// Try to create the symlink if it is in the archive, but don't hold up the process
+			// if the file cannot be created. In that case just skip over it entirely.
+			if f.LinkTarget != "" {
+				if err := fs.Symlink(p, f.LinkTarget); err != nil {
+					if errors.Is(err, os.ErrNotExist) {
+						return nil
+					}
+					return errors.Wrap(err, "server/filesystem: decompress: failed to create symlink")
+				}
+			}
+		} else {
+			if err := fs.Write(p, r, f.Size(), f.Mode()); err != nil {
+				return errors.Wrap(err, "server/filesystem: decompress: failed to write file")
+			}
+		}
+		// Update the file modification time to the one set in the archive.
+		if err := fs.Chtimes(p, f.ModTime(), f.ModTime()); err != nil {
+			return errors.Wrap(err, "server/filesystem: decompress: failed to update file modification time")
+		}
+		return nil
+	})
 }
 
 // ExtractStreamUnsafe .
