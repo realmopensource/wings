@@ -441,7 +441,9 @@ func (fs *Filesystem) ListDirectory(p string) ([]Stat, error) {
 			// @see https://github.com/pterodactyl/panel/issues/4059
 			if fi.Mode()&os.ModeNamedPipe == 0 {
 				if f, err := fs.root.Open(normalize(filepath.Join(p, d.Name()))); err != nil {
-					log.WithField("error", err).WithField("path", filepath.Join(p, d.Name())).Warn("error opening file for mimetype detection")
+					if !IsPathError(err) && !IsLinkError(err) {
+						log.WithField("error", err).WithField("path", filepath.Join(p, d.Name())).Warn("error opening file for mimetype detection")
+					}
 				} else {
 					if m, err := mimetype.DetectReader(f); err == nil {
 						st.Mimetype = m.String()
