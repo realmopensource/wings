@@ -3,6 +3,7 @@ package filesystem
 import (
 	"archive/tar"
 	"context"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -58,6 +59,7 @@ type ArchiveOption func(a *Archive) error
 
 type Archive struct {
 	root     *os.Root
+	dir      string
 	pw       *TarProgress
 	ignored  *ignore.GitIgnore
 	matching *ignore.GitIgnore
@@ -65,15 +67,23 @@ type Archive struct {
 }
 
 // NewArchive returns a new archive instance that can be used for generating an
-// archive of files and folders within the provided os.Root.
-func NewArchive(r *os.Root, p *progress.Progress, opts ...ArchiveOption) (*Archive, error) {
-	a := &Archive{root: r, p: p}
+// archive of files and folders within the provided os.Root. The "dir" value is
+// a child directory within the `os.Root` instance.
+func NewArchive(r *os.Root, dir string, opts ...ArchiveOption) (*Archive, error) {
+	a := &Archive{root: r, dir: dir}
 	for _, opt := range opts {
 		if err := opt(a); err != nil {
 			return nil, errors.Wrap(err, "server/filesystem: archive: failed to apply callback option")
 		}
 	}
 	return a, nil
+}
+
+func WithProgress(p *progress.Progress) ArchiveOption {
+	return func(a *Archive) error {
+		a.p = p
+		return nil
+	}
 }
 
 func WithIgnored(files []string) ArchiveOption {
@@ -112,10 +122,6 @@ func WithMatching(files []string) ArchiveOption {
 
 func (a *Archive) Progress() *progress.Progress {
 	return a.p
-}
-
-func (a *Archive) Close() error {
-	return a.root.Close()
 }
 
 // Create .
@@ -160,12 +166,19 @@ func (a *Archive) Stream(ctx context.Context, w io.Writer) error {
 	a.pw = NewTarProgress(tw, a.p)
 	defer a.pw.Close()
 
-	return filepath.WalkDir(a.rootPath(), a.walker(ctx))
+	r, err := a.root.OpenRoot(normalize(a.dir))
+	if err != nil {
+		return errors.Wrap(err, "server/filesystem: archive: failed to acquire root dir instance")
+	}
+	defer r.Close()
+
+	base := strings.TrimRight(r.Name(), "./")
+	return filepath.WalkDir(base, a.walker(ctx, base))
 }
 
 // Callback function used to determine if a given file should be included in the archive
 // being generated.
-func (a *Archive) walker(ctx context.Context) fs.WalkDirFunc {
+func (a *Archive) walker(ctx context.Context, base string) fs.WalkDirFunc {
 	return func(path string, de fs.DirEntry, err error) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -175,7 +188,7 @@ func (a *Archive) walker(ctx context.Context) fs.WalkDirFunc {
 			return fs.SkipDir
 		}
 
-		path = strings.TrimPrefix(path, a.rootPath())
+		path = strings.TrimPrefix(path, base)
 		if a.ignored != nil && a.ignored.MatchesPath(path) {
 			return nil
 		}
@@ -210,28 +223,26 @@ func (a *Archive) addToArchive(p string) error {
 	// Resolve the symlink target if the file is a symlink.
 	var target string
 	if s.Mode()&fs.ModeSymlink != 0 {
-		// Read the target of the symlink. If there are any errors we will dump them out to
-		// the logs, but we're not going to stop the backup. There are far too many cases of
-		// symlinks causing all sorts of unnecessary pain in this process. Sucks to suck if
-		// it doesn't work.
-		target, err = a.root.Readlink(s.Name())
+		// This intentionally uses [os.Readlink] and not the [os.Root] instance. We need to
+		// know the actual target for the symlink, even if outside the server directory, so
+		// that we can restore it properly.
+		//
+		// This target is only used for the sake of keeping everything correct in the archive;
+		// we never read the target file contents.
+		target, err = os.Readlink(filepath.Join(a.root.Name(), p))
 		if err != nil {
-			return nil
+			target = ""
 		}
+		fmt.Println(p, " targeting ", target)
 	}
 
 	// Get the tar FileInfoHeader to add the file to the archive.
-	header, err := tar.FileInfoHeader(s, filepath.ToSlash(target))
+	header, err := tar.FileInfoHeader(s, target)
 	if err != nil {
 		return errors.Wrap(err, "server/filesystem: archive: failed to get file info header")
 	}
 
-	// Fix the header name if the file is not a symlink.
-	if s.Mode()&fs.ModeSymlink == 0 {
-		header.Name = p
-	}
-
-	// Write the tar FileInfoHeader to the archive.
+	header.Name = p
 	if err := a.pw.WriteHeader(header); err != nil {
 		return errors.Wrap(err, "server/filesystem: archive: failed to write tar header")
 	}
@@ -268,8 +279,4 @@ func (a *Archive) addToArchive(p string) error {
 	}
 
 	return nil
-}
-
-func (a *Archive) rootPath() string {
-	return strings.TrimSuffix(a.root.Name(), "/.")
 }

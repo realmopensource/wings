@@ -25,7 +25,7 @@ func (t *Transfer) Archive() (*Archive, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "server/transfer: failed to open root directory")
 		}
-		a, err := filesystem.NewArchive(r, progress.NewProgress(uint64(rawSize)))
+		a, err := filesystem.NewArchive(r, "/", filesystem.WithProgress(progress.NewProgress(uint64(rawSize))))
 		if err != nil {
 			_ = r.Close()
 			return nil, errors.WrapIf(err, "server/transfer: failed to create archive")

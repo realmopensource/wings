@@ -30,19 +30,13 @@ type extractOptions struct {
 // and the compressed file will be placed at that location named
 // `archive-{date}.tar.gz`.
 func (fs *Filesystem) CompressFiles(ctx context.Context, dir string, paths []string) (os.FileInfo, error) {
-	r, err := fs.root.OpenRoot(normalize(dir))
+	a, err := NewArchive(fs.root, dir, WithMatching(paths))
 	if err != nil {
-		return nil, errors.Wrap(err, "server/filesystem: compress: failed to open root directory")
-	}
-	a, err := NewArchive(r, nil, WithMatching(paths))
-	if err != nil {
-		_ = r.Close()
 		return nil, errors.WrapIf(err, "server/filesystem: compress: failed to create archive instance")
 	}
-	defer a.Close()
 
 	n := fmt.Sprintf("archive-%s.tar.gz", strings.ReplaceAll(time.Now().Format(time.RFC3339), ":", ""))
-	f, err := r.OpenFile(n, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	f, err := fs.root.OpenFile(normalize(filepath.Join(dir, n)), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
 		return nil, errors.Wrap(err, "server/filesystem: compress: failed to open file for writing")
 	}
@@ -112,7 +106,6 @@ func (fs *Filesystem) extractStream(ctx context.Context, opts extractOptions) er
 		defer reader.Close()
 
 		// Open the file for creation/writing
-		fmt.Println("open file", normalize(p), p)
 		f, err := fs.root.OpenFile(normalize(p), os.O_WRONLY|os.O_CREATE, 0o644)
 		if err != nil {
 			return errors.Wrap(err, "server/filesystem: decompress: failed to open file")
@@ -162,22 +155,32 @@ func (fs *Filesystem) extractStream(ctx context.Context, opts extractOptions) er
 			// Try to create the symlink if it is in the archive, but don't hold up the process
 			// if the file cannot be created. In that case just skip over it entirely.
 			if f.LinkTarget != "" {
-				if err := fs.Symlink(p, f.LinkTarget); err != nil {
-					if errors.Is(err, os.ErrNotExist) {
+				p2 := strings.TrimLeft(filepath.Clean(p), string(filepath.Separator))
+				if p2 == "" {
+					p2 = "."
+				}
+				// We don't use [fs.Symlink] here because that normalizes the source directory for
+				// consistency with the codebase. In this case when decompressing we want to just
+				// accept the source without any normalization.
+				if err := fs.root.Symlink(f.LinkTarget, p2); err != nil {
+					if errors.Is(err, os.ErrNotExist) || IsPathError(err) || IsLinkError(err) {
 						return nil
 					}
 					return errors.Wrap(err, "server/filesystem: decompress: failed to create symlink")
 				}
 			}
-		} else {
-			if err := fs.Write(p, r, f.Size(), f.Mode()); err != nil {
-				return errors.Wrap(err, "server/filesystem: decompress: failed to write file")
-			}
+			return nil
 		}
+
+		if err := fs.Write(p, r, f.Size(), f.Mode()); err != nil {
+			return errors.Wrap(err, "server/filesystem: decompress: failed to write file")
+		}
+
 		// Update the file modification time to the one set in the archive.
 		if err := fs.Chtimes(p, f.ModTime(), f.ModTime()); err != nil {
 			return errors.Wrap(err, "server/filesystem: decompress: failed to update file modification time")
 		}
+
 		return nil
 	})
 }

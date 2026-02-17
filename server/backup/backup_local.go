@@ -65,12 +65,11 @@ func (b *LocalBackup) Generate(ctx context.Context, basePath, ignore string) (*A
 	if err != nil {
 		return nil, errors.Wrap(err, "server/backup: failed to open root directory")
 	}
-	a, err := filesystem.NewArchive(r, nil, filesystem.WithIgnored(strings.Split(ignore, "\n")))
+	defer r.Close()
+	a, err := filesystem.NewArchive(r, "/", filesystem.WithIgnored(strings.Split(ignore, "\n")))
 	if err != nil {
-		_ = r.Close()
 		return nil, errors.WrapIf(err, "server/backup: failed to create archive")
 	}
-	defer a.Close()
 
 	b.log().WithField("path", b.Path()).Info("creating backup for server")
 	f, err := os.OpenFile(b.Path(), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)

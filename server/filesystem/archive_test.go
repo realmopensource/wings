@@ -23,7 +23,7 @@ func TestArchive_Stream(t *testing.T) {
 		})
 
 		g.It("throws an error when passed invalid file paths", func() {
-			a, err := NewArchive(fs.root, nil, WithMatching([]string{"yeet"}))
+			a, err := NewArchive(fs.root, WithMatching([]string{"yeet"}))
 			if err != nil {
 				panic(err)
 			}

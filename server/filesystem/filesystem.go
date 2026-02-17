@@ -338,7 +338,15 @@ func (fs *Filesystem) Copy(p string) error {
 	return fs.Writefile(path.Join(relative, n), source)
 }
 
-// Symlink creates a symbolic link between the source and target paths.
+// Symlink creates a symbolic link between the source and target paths. [os.Root].Symlink
+// allows for the creation of a symlink that targets a file outside the root directory.
+// This isn't the end of the world because the read is blocked through this system, and
+// within a container it would just point to something in the readonly filesystem.
+//
+// There are also valid use-cases where a symlink might need to point to a file outside
+// the server data directory for a server to operate correctly. Since everything in the
+// filesystem runs through os.Root though we're protected from accidentally reading a
+// sensitive file on the _host_ OS.
 func (fs *Filesystem) Symlink(source, target string) error {
 	source = normalize(source)
 	target = normalize(target)

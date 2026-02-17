@@ -56,12 +56,11 @@ func (s *S3Backup) Generate(ctx context.Context, basePath, ignore string) (*Arch
 	if err != nil {
 		return nil, errors.Wrap(err, "backup: failed to open root directory")
 	}
-	a, err := filesystem.NewArchive(r, nil, filesystem.WithIgnored(strings.Split(ignore, "\n")))
+	defer r.Close()
+	a, err := filesystem.NewArchive(r, "/", filesystem.WithIgnored(strings.Split(ignore, "\n")))
 	if err != nil {
-		_ = r.Close()
 		return nil, errors.WrapIf(err, "backup: failed to create archive")
 	}
-	defer a.Close()
 
 	s.log().WithField("path", s.Path()).Info("creating backup for server")
 	f, err := os.OpenFile(s.Path(), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)

@@ -50,7 +50,6 @@ func (fs *Filesystem) Chown(path string) error {
 		return errors.WrapIf(err, "server/filesystem: chown: failed to stat path")
 	}
 
-	fmt.Println("walking path", filepath.Join(fs.rootPath, path))
 	// If this was a directory, begin walking over its contents recursively and ensure that all
 	// the subfiles and directories get their permissions updated as well.
 	err := godirwalk.Walk(filepath.Join(fs.rootPath, path), &godirwalk.Options{
