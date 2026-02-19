@@ -1,21 +1,24 @@
 package filesystem
 
 import (
+	fs2 "io/fs"
+	"os"
 	"path/filepath"
-	"strings"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"emperror.dev/errors"
 	"github.com/apex/log"
-	"github.com/karrick/godirwalk"
+	"golang.org/x/sys/unix"
 )
 
 type SpaceCheckingOpts struct {
 	AllowStaleResponse bool
 }
 
+// TODO: can this be replaced with some sort of atomic? Like atomic.Pointer?
 type usageLookupTime struct {
 	sync.RWMutex
 	value time.Time
@@ -36,12 +39,13 @@ func (ult *usageLookupTime) Get() time.Time {
 	return ult.value
 }
 
-// Returns the maximum amount of disk space that this Filesystem instance is allowed to use.
+// MaxDisk returns the maximum amount of disk space that this Filesystem
+// instance is allowed to use.
 func (fs *Filesystem) MaxDisk() int64 {
 	return atomic.LoadInt64(&fs.diskLimit)
 }
 
-// Sets the disk space limit for this Filesystem instance.
+// SetDiskLimit sets the disk space limit for this Filesystem instance.
 func (fs *Filesystem) SetDiskLimit(i int64) {
 	atomic.SwapInt64(&fs.diskLimit, i)
 }
@@ -66,7 +70,7 @@ func (fs *Filesystem) HasSpaceErr(allowStaleValue bool) error {
 func (fs *Filesystem) HasSpaceAvailable(allowStaleValue bool) bool {
 	size, err := fs.DiskUsage(allowStaleValue)
 	if err != nil {
-		log.WithField("root", fs.root).WithField("error", err).Warn("failed to determine root fs directory size")
+		log.WithField("root", fs.Path()).WithField("error", err).Warn("failed to determine root fs directory size")
 	}
 
 	// If space is -1 or 0 just return true, means they're allowed unlimited.
@@ -115,7 +119,7 @@ func (fs *Filesystem) DiskUsage(allowStaleValue bool) (int64, error) {
 			// currently performing a lookup, just do the disk usage calculation in the background.
 			go func(fs *Filesystem) {
 				if _, err := fs.updateCachedDiskUsage(); err != nil {
-					log.WithField("root", fs.root).WithField("error", err).Warn("failed to update fs disk usage from within routine")
+					log.WithField("root", fs.rootPath).WithField("error", err).Warn("failed to update fs disk usage from within routine")
 				}
 			}(fs)
 		}
@@ -155,37 +159,55 @@ func (fs *Filesystem) updateCachedDiskUsage() (int64, error) {
 	return size, err
 }
 
-// Determines the directory size of a given location by running parallel tasks to iterate
-// through all of the folders. Returns the size in bytes. This can be a fairly taxing operation
-// on locations with tons of files, so it is recommended that you cache the output.
+// DirectorySize determines the directory size of a given location. Returns the size
+// in bytes. This can be a fairly taxing operation on locations with tons of files,
+// so it is recommended that you cache the output.
 func (fs *Filesystem) DirectorySize(dir string) (int64, error) {
-	dir = strings.TrimLeft(filepath.Clean(dir), "/")
-	if dir != "" {
+	dir = normalize(dir)
+	if dir != "." {
 		if _, err := fs.root.Lstat(dir); err != nil {
 			return 0, err
 		}
 	}
 
+	rt := fs.root
+	if dir != "." {
+		r, err := fs.root.OpenRoot(dir)
+		if err != nil {
+			return 0, errors.Wrap(err, "server/filesystem: directorysize: failed to open root directory")
+		}
+		defer r.Close()
+		rt = r
+	}
+
 	var size int64
-	err := godirwalk.Walk(filepath.Join(fs.rootPath, dir), &godirwalk.Options{
-		Unsorted:            true,
-		FollowSymbolicLinks: false,
-		Callback: func(p string, e *godirwalk.Dirent) error {
-			if !e.ModeType().IsRegular() {
+	var links []uint64
+
+	err := filepath.WalkDir(rt.Name(), func(path string, d fs2.DirEntry, err error) error {
+		if !d.Type().IsRegular() {
+			return nil
+		}
+
+		st, err := d.Info()
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
 				return nil
 			}
+			return err
+		}
 
-			if !e.IsDir() {
-				st, err := fs.root.Lstat(strings.TrimLeft(strings.TrimPrefix(p, fs.rootPath), "/"))
-				if err != nil {
-					return errors.Wrap(err, "server/filesystem: directorysize: failed to stat file")
-				}
-				atomic.AddInt64(&size, st.Size())
+		s := st.Sys().(*unix.Stat_t)
+		if s.Nlink > 1 {
+			// Hard links have the same inode number, don't add them more than once.
+			if slices.Contains(links, s.Ino) {
+				return nil
 			}
+			links = append(links, s.Ino)
+		}
 
-			// todo: don't count hardlinks twice
-			return nil
-		},
+		size += st.Size()
+
+		return nil
 	})
 
 	return size, errors.WrapIf(err, "server/filesystem: directorysize: failed to walk directory")

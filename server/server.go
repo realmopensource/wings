@@ -300,7 +300,7 @@ func (s *Server) EnsureDataDirectoryExists() (string, error) {
 	path := filepath.Join(c.System.Data, s.ID())
 
 	if _, err := os.Lstat(path); err != nil {
-		if !os.IsNotExist(err) {
+		if !errors.Is(err, os.ErrNotExist) {
 			return path, errors.Wrap(err, "server: failed to stat server root directory")
 		}
 

@@ -154,17 +154,11 @@ func (s *Server) RestoreBackup(b backup.BackupInterface, reader io.ReadCloser) (
 	err = b.Restore(s.Context(), reader, func(file string, info fs.FileInfo, r io.ReadCloser) error {
 		defer r.Close()
 		s.Events().Publish(DaemonMessageEvent, "(restoring): "+file)
-
-		if err := s.Filesystem().Writefile(file, r); err != nil {
+		if err := s.Filesystem().Write(file, r, info.Size(), info.Mode()); err != nil {
 			return err
 		}
-		if err := s.Filesystem().Chmod(file, info.Mode()); err != nil {
-			return err
-		}
-
 		atime := info.ModTime()
-		mtime := atime
-		return s.Filesystem().Chtimes(file, atime, mtime)
+		return s.Filesystem().Chtimes(file, atime, atime)
 	})
 
 	return errors.WithStackIf(err)

@@ -28,6 +28,7 @@ func (t *Transfer) PushArchiveToTarget(url, token string) ([]byte, error) {
 		t.Error(err, "Failed to get archive for transfer.")
 		return nil, errors.New("failed to get archive for transfer")
 	}
+	defer a.archive.Close()
 
 	t.SendMessage("Streaming archive to destination...")
 

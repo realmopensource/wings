@@ -77,6 +77,14 @@ func (fs *Filesystem) Path() string {
 	return fs.rootPath
 }
 
+// Close closes the underlying os.Root instance for the server.
+func (fs *Filesystem) Close() error {
+	if err := fs.root.Close(); err != nil {
+		return errors.Wrap(err, "server/filesystem: failed to close root")
+	}
+	return nil
+}
+
 // File returns a reader for a file instance as well as the stat information.
 func (fs *Filesystem) File(p string) (*os.File, Stat, error) {
 	p = normalize(p)

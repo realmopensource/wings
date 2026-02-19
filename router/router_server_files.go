@@ -30,8 +30,7 @@ import (
 // getServerFileContents returns the contents of a file on the server.
 func getServerFileContents(c *gin.Context) {
 	s := middleware.ExtractServer(c)
-	p := "/" + strings.TrimLeft(c.Query("file"), "/")
-	f, st, err := s.Filesystem().File(p)
+	f, st, err := s.Filesystem().File(c.Query("file"))
 	if err != nil {
 		middleware.CaptureAndAbort(c, err)
 		return
@@ -248,7 +247,7 @@ func postServerWriteFile(c *gin.Context) {
 		return
 	}
 
-	if err := s.Filesystem().Writefile(f, c.Request.Body); err != nil {
+	if err := s.Filesystem().Write(f, c.Request.Body, c.Request.ContentLength, 0o644); err != nil {
 		if filesystem.IsErrorCode(err, filesystem.ErrCodeIsDirectory) {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
 				"error": "Cannot write file, name conflicts with an existing directory by the same name.",
@@ -622,7 +621,7 @@ func handleFileUpload(p string, s *server.Server, header *multipart.FileHeader) 
 	if err := s.Filesystem().IsIgnored(p); err != nil {
 		return err
 	}
-	if err := s.Filesystem().Writefile(p, file); err != nil {
+	if err := s.Filesystem().Write(p, file, header.Size, 0o644); err != nil {
 		return err
 	}
 	return nil

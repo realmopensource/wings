@@ -107,9 +107,9 @@ func (l Limits) AsContainerResources() container.Resources {
 		Memory:            l.BoundedMemoryLimit(),
 		MemoryReservation: l.MemoryLimit * 1024 * 1024,
 		MemorySwap:        l.ConvertedSwap(),
-		BlkioWeight:       l.IoWeight,
-		OomKillDisable:    &l.OOMDisabled,
-		PidsLimit:         &pids,
+		// BlkioWeight:       l.IoWeight,
+		OomKillDisable: &l.OOMDisabled,
+		PidsLimit:      &pids,
 	}
 
 	// If the CPU Limit is not set, don't send any of these fields through. Providing
