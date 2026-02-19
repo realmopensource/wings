@@ -123,13 +123,6 @@ func (a *Archive) Progress() *progress.Progress {
 	return a.p
 }
 
-func (a *Archive) Close() error {
-	if err := a.root.Close(); err != nil {
-		return errors.Wrap(err, "server/filesystem: archive: failed to close root")
-	}
-	return nil
-}
-
 // Create .
 func (a *Archive) Create(ctx context.Context, f *os.File) error {
 	// Select a writer based off of the WriteLimit configuration option. If there is no

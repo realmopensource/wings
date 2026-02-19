@@ -57,6 +57,7 @@ func (fs *Filesystem) SpaceAvailableForDecompression(ctx context.Context, dir st
 		return nil
 	}
 
+	// todo: rest of the owl
 	return nil
 }
 

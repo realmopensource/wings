@@ -13,7 +13,7 @@ import (
 
 // Archive returns an archive that can be used to stream the contents of the
 // contents of a server.
-func (t *Transfer) Archive() (*Archive, error) {
+func (t *Transfer) Archive(r *os.Root) (*Archive, error) {
 	if t.archive == nil {
 		// Get the disk usage of the server (used to calculate the progress of the archive process)
 		rawSize, err := t.Server.Filesystem().DiskUsage(true)
@@ -21,10 +21,6 @@ func (t *Transfer) Archive() (*Archive, error) {
 			return nil, fmt.Errorf("transfer: failed to get server disk usage: %w", err)
 		}
 
-		r, err := os.OpenRoot(t.Server.Filesystem().Path())
-		if err != nil {
-			return nil, errors.Wrap(err, "server/transfer: failed to open root directory")
-		}
 		a, err := filesystem.NewArchive(r, "/", filesystem.WithProgress(progress.NewProgress(uint64(rawSize))))
 		if err != nil {
 			_ = r.Close()
