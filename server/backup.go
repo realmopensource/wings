@@ -160,10 +160,9 @@ func (s *Server) RestoreBackup(b backup.BackupInterface, reader io.ReadCloser) (
 		s.Events().Publish(DaemonMessageEvent, "(restoring): "+file)
 		if info.IsDir() {
 			if err := s.Filesystem().Mkdir(file, info.Mode().Perm()); err != nil {
-				if errors.Is(err, os.ErrExist) {
-					return nil
+				if !errors.Is(err, os.ErrExist) {
+					return errors.WithStack(err)
 				}
-				return errors.WithStack(err)
 			}
 		} else {
 			if !info.Mode().IsRegular() {
