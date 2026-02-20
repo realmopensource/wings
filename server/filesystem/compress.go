@@ -53,7 +53,6 @@ func (fs *Filesystem) CompressFiles(ctx context.Context, dir string, paths []str
 		_ = fs.root.Remove(normalize(filepath.Join(dir, n)))
 		return nil, err
 	}
-	fmt.Println("wrote bytes", cw.BytesWritten())
 	fs.addDisk(cw.BytesWritten())
 
 	return f.Stat()

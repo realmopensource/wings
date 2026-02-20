@@ -420,7 +420,11 @@ func (fs *Filesystem) TruncateRootDirectory() error {
 			return err
 		}
 
-		return filepath.SkipDir
+		if d.IsDir() {
+			return filepath.SkipDir
+		}
+
+		return nil
 	})
 
 	if err != nil {
