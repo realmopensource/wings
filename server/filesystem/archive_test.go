@@ -22,15 +22,6 @@ func TestArchive_Stream(t *testing.T) {
 			fs.reset()
 		})
 
-		g.It("throws an error when passed invalid file paths", func() {
-			a, err := NewArchive(fs.root, WithMatching([]string{"yeet"}))
-			if err != nil {
-				panic(err)
-			}
-
-			g.Assert(a.Create(context.Background(), "")).IsNotNil()
-		})
-
 		g.It("creates archive with intended files", func() {
 			g.Assert(fs.CreateDirectory("test", "/")).IsNil()
 			g.Assert(fs.CreateDirectory("test2", "/")).IsNil()
@@ -47,15 +38,16 @@ func TestArchive_Stream(t *testing.T) {
 			err = fs.Writefile("test_file.txt.old", strings.NewReader("hello, world!\n"))
 			g.Assert(err).IsNil()
 
-			a, err := NewArchive(fs.root, nil, WithMatching([]string{"test", "test_file.txt"}))
-
-			// Create the archive.
 			archivePath := filepath.Join(fs.rootPath, "../archive.tar.gz")
-			g.Assert(a.Create(context.Background(), archivePath)).IsNil()
+			f, err := os.Create(archivePath)
+			if err != nil {
+				panic(err)
+			}
+			defer f.Close()
 
-			// Ensure the archive exists.
-			_, err = os.Stat(archivePath)
-			g.Assert(err).IsNil()
+			a, err := NewArchive(fs.root, ".", WithMatching([]string{"test", "test_file.txt"}))
+
+			g.Assert(a.Create(context.Background(), f)).IsNil()
 
 			// Open the archive.
 			genericFs, err := archives.FileSystem(context.Background(), archivePath, nil)
@@ -100,13 +92,19 @@ func TestArchive_Stream(t *testing.T) {
 				panic(err)
 			}
 
-			a, err := NewArchive(fs.root, nil)
+			archivePath := filepath.Join(fs.rootPath, "../archive.tar.gz")
+			f, err := os.Create(archivePath)
+			if err != nil {
+				panic(err)
+			}
+			defer f.Close()
+
+			a, err := NewArchive(fs.root, ".")
 			if err != nil {
 				panic(err)
 			}
 
-			archivePath := filepath.Join(fs.rootPath, "../archive.tar.gz")
-			err = a.Create(context.Background(), archivePath)
+			err = a.Create(context.Background(), f)
 			g.Assert(err).IsNil()
 
 			// Open the archive.
