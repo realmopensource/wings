@@ -188,6 +188,13 @@ func (fs *Filesystem) Writefile(p string, r io.Reader) error {
 	return fs.Chown(p)
 }
 
+func (fs *Filesystem) Mkdir(p string, mode os.FileMode) error {
+	if err := fs.root.Mkdir(normalize(p), mode); err != nil {
+		return errors.Wrap(err, "server/filesystem: mkdir: failed to make directory")
+	}
+	return nil
+}
+
 // Write writes a file to the disk.
 func (fs *Filesystem) Write(p string, r io.Reader, newSize int64, mode os.FileMode) error {
 	st, err := fs.root.Stat(normalize(p))
@@ -200,7 +207,7 @@ func (fs *Filesystem) Write(p string, r io.Reader, newSize int64, mode os.FileMo
 	var c int64
 	if err == nil {
 		if st.IsDir() {
-			return errors.WithStack(&Error{code: ErrCodeIsDirectory, resolved: ""})
+			return errors.WithStack(&Error{code: ErrCodeIsDirectory, resolved: normalize(p)})
 		}
 		c = st.Size()
 	}
@@ -403,7 +410,33 @@ func (fs *Filesystem) ReadDir(p string) ([]fs2.DirEntry, error) {
 // TruncateRootDirectory removes _all_ files and directories from a server's
 // data directory and resets the used disk space to zero.
 func (fs *Filesystem) TruncateRootDirectory() error {
-	return errors.New("server/filesystem: not implemented")
+	err := filepath.WalkDir(fs.rootPath, func(path string, d fs2.DirEntry, err error) error {
+		p := normalize(strings.TrimPrefix(path, fs.rootPath))
+		if p == "." {
+			return nil
+		}
+
+		if err := fs.root.RemoveAll(p); err != nil {
+			return err
+		}
+
+		return filepath.SkipDir
+	})
+
+	if err != nil {
+		go func() {
+			// If there was an error, re-calculate the disk usage right away to account
+			// for any partially removed files.
+			_, _ = fs.updateCachedDiskUsage()
+		}()
+
+		return errors.Wrap(err, "server/filesystem: truncate: failed to walk root directory")
+	}
+
+	// Set the disk space back to zero.
+	fs.addDisk(fs.diskUsed * -1)
+
+	return nil
 }
 
 // Delete removes a file or folder from the system. Prevents the user from

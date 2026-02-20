@@ -423,7 +423,13 @@ func postServerCompressFiles(c *gin.Context) {
 
 	f, err := s.Filesystem().CompressFiles(c.Request.Context(), data.RootPath, data.Files)
 	if err != nil {
-		middleware.CaptureAndAbort(c, err)
+		if errors.Is(err, filesystem.ErrNoSpaceAvailable) {
+			c.AbortWithStatusJSON(http.StatusConflict, gin.H{
+				"error": "This server does not have enough available disk space to generate a compressed archive.",
+			})
+		} else {
+			middleware.CaptureAndAbort(c, err)
+		}
 		return
 	}
 
@@ -447,17 +453,6 @@ func postServerDecompressFiles(c *gin.Context) {
 
 	s := middleware.ExtractServer(c)
 	lg := middleware.ExtractLogger(c).WithFields(log.Fields{"root_path": data.RootPath, "file": data.File})
-	lg.Debug("checking if space is available for file decompression")
-	err := s.Filesystem().SpaceAvailableForDecompression(context.Background(), data.RootPath, data.File)
-	if err != nil {
-		if filesystem.IsErrorCode(err, filesystem.ErrCodeUnknownArchive) {
-			lg.WithField("error", err).Warn("failed to decompress file: unknown archive format")
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "The archive provided is in a format Wings does not understand."})
-			return
-		}
-		middleware.CaptureAndAbort(c, err)
-		return
-	}
 
 	lg.Info("starting file decompression")
 	if err := s.Filesystem().DecompressFile(context.Background(), data.RootPath, data.File); err != nil {

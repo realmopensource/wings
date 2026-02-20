@@ -7,11 +7,11 @@ import (
 	"slices"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"emperror.dev/errors"
 	"github.com/apex/log"
-	"golang.org/x/sys/unix"
 )
 
 type SpaceCheckingOpts struct {
@@ -59,14 +59,13 @@ func (fs *Filesystem) HasSpaceErr(allowStaleValue bool) error {
 	return nil
 }
 
-// Determines if the directory a file is trying to be added to has enough space available
-// for the file to be written to.
+// HasSpaceAvailable checks if the directory a file is trying to be added to has enough
+// space available for the file to be written to. Because determining the amount of space
+// being used by a server is a taxing operation, we will load it all up into a cache and
+// pull from that as long as the key is not expired.
 //
-// Because determining the amount of space being used by a server is a taxing operation we
-// will load it all up into a cache and pull from that as long as the key is not expired.
-//
-// This operation will potentially block unless allowStaleValue is set to true. See the
-// documentation on DiskUsage for how this affects the call.
+// This operation will potentially be blocked unless allowStaleValue is set to true. See
+// the documentation on DiskUsage for how this affects the call.
 func (fs *Filesystem) HasSpaceAvailable(allowStaleValue bool) bool {
 	size, err := fs.DiskUsage(allowStaleValue)
 	if err != nil {
@@ -196,7 +195,7 @@ func (fs *Filesystem) DirectorySize(dir string) (int64, error) {
 			return err
 		}
 
-		s := st.Sys().(*unix.Stat_t)
+		s := st.Sys().(*syscall.Stat_t)
 		if s.Nlink > 1 {
 			// Hard links have the same inode number, don't add them more than once.
 			if slices.Contains(links, s.Ino) {

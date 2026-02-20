@@ -21,6 +21,8 @@ import (
 
 const memory = 4 * 1024
 
+var ErrNoSpaceAvailable = errors.Sentinel("archive: no space available on disk")
+
 var pool = sync.Pool{
 	New: func() interface{} {
 		b := make([]byte, memory)

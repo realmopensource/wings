@@ -11,6 +11,7 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/mholt/archives"
+	"github.com/pterodactyl/wings/internal"
 )
 
 type extractOptions struct {
@@ -42,23 +43,20 @@ func (fs *Filesystem) CompressFiles(ctx context.Context, dir string, paths []str
 	}
 	defer f.Close()
 
-	if err := a.Create(ctx, f); err != nil {
+	cw := internal.NewCountedWriter(f)
+	// todo: eventing on the counted writer so that we can slowly increase the disk
+	//  used value on the server as the file gets written?
+	if err := a.Stream(ctx, cw); err != nil {
 		return nil, errors.Wrap(err, "server/filesystem: compress: failed to write to disk")
 	}
-
-	// todo: disk space
-	return f.Stat()
-}
-
-// SpaceAvailableForDecompression looks through a given archive and determines
-// if decompressing it would put the server over its allocated disk space limit.
-func (fs *Filesystem) SpaceAvailableForDecompression(ctx context.Context, dir string, file string) error {
-	if fs.MaxDisk() <= 0 {
-		return nil
+	if err := fs.HasSpaceFor(cw.BytesWritten()); err != nil {
+		_ = fs.root.Remove(normalize(filepath.Join(dir, n)))
+		return nil, err
 	}
+	fmt.Println("wrote bytes", cw.BytesWritten())
+	fs.addDisk(cw.BytesWritten())
 
-	// todo: rest of the owl
-	return nil
+	return f.Stat()
 }
 
 // DecompressFile will decompress a file in a given directory by using the
@@ -173,7 +171,7 @@ func (fs *Filesystem) extractStream(ctx context.Context, opts extractOptions) er
 			return nil
 		}
 
-		if err := fs.Write(p, r, f.Size(), f.Mode()); err != nil {
+		if err := fs.Write(p, r, f.Size(), f.Mode().Perm()); err != nil {
 			return errors.Wrap(err, "server/filesystem: decompress: failed to write file")
 		}
 
@@ -188,5 +186,16 @@ func (fs *Filesystem) extractStream(ctx context.Context, opts extractOptions) er
 
 // ExtractStreamUnsafe .
 func (fs *Filesystem) ExtractStreamUnsafe(ctx context.Context, dir string, r io.Reader) error {
-	return errors.New("server/fs: not implemented")
+	format, input, err := archives.Identify(ctx, "archive.tar.gz", r)
+	if err != nil {
+		if errors.Is(err, archives.NoMatch) {
+			return newFilesystemError(ErrCodeUnknownArchive, err)
+		}
+		return err
+	}
+	return fs.extractStream(ctx, extractOptions{
+		dir:    dir,
+		format: format,
+		r:      input,
+	})
 }

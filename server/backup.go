@@ -153,10 +153,21 @@ func (s *Server) RestoreBackup(b backup.BackupInterface, reader io.ReadCloser) (
 	s.Log().Debug("starting file writing process for backup restoration")
 	err = b.Restore(s.Context(), reader, func(file string, info fs.FileInfo, r io.ReadCloser) error {
 		defer r.Close()
-		s.Events().Publish(DaemonMessageEvent, "(restoring): "+file)
-		if err := s.Filesystem().Write(file, r, info.Size(), info.Mode()); err != nil {
-			return err
+		if file == "." {
+			return nil
 		}
+
+		s.Events().Publish(DaemonMessageEvent, "(restoring): "+file)
+		if info.IsDir() {
+			if err := s.Filesystem().Mkdir(file, info.Mode().Perm()); err != nil {
+				return errors.WithStack(err)
+			}
+		} else {
+			if err := s.Filesystem().Write(file, r, info.Size(), info.Mode().Perm()); err != nil {
+				return errors.WithStack(err)
+			}
+		}
+
 		atime := info.ModTime()
 		return s.Filesystem().Chtimes(file, atime, atime)
 	})
