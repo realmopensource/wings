@@ -23,7 +23,7 @@ import (
 // Docker events being output to the socket will fail when it hasn't been
 // properly initialized yet.
 //
-// @see https://github.com/pterodactyl/panel/issues/3295
+// @see https://github.com/realmopensource/panel/issues/3295
 func (h *Handler) registerListenerEvents(ctx context.Context) {
 	h.Logger().Debug("registering event listeners for connection")
 

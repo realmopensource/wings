@@ -157,7 +157,7 @@ func (e *Environment) ExitState() (uint32, bool, error) {
 		// so I guess this should prevent it? They didn't tell me how they caused it though
 		// so that's a mystery that will have to go unsolved.
 		//
-		// @see https://github.com/pterodactyl/panel/issues/2003
+		// @see https://github.com/realmopensource/panel/issues/2003
 		if client.IsErrNotFound(err) {
 			return 1, false, nil
 		}

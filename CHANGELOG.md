@@ -8,43 +8,43 @@
 
 ## v1.12.1
 ### Added
-* Add mount for /etc/machine-id for servers for Hytale ([#292](https://github.com/pterodactyl/wings/pull/292))
+* Add mount for /etc/machine-id for servers for Hytale ([#292](https://github.com/realmopensource/wings/pull/292))
 
 ## v1.12.0
 ### Fixed
-* [CVE-2025-68954](https://github.com/pterodactyl/panel/security/advisories/GHSA-8c39-xppg-479c)
-* [CVE-2025-69199](https://github.com/pterodactyl/panel/security/advisories/GHSA-8w7m-w749-rx98)
-* [CVE-2026-21696](https://github.com/pterodactyl/wings/security/advisories/GHSA-2497-gp99-2m74)
-* Fixes folders not being sorted before files when returning list of directory contents ([#5078](https://github.com/pterodactyl/panel/issues/5078))
-* User-defined labels not being passed to environment ([#191](https://github.com/pterodactyl/wings/pulls/191))
-* Fixes handling of termination signals for containers ([#192](https://github.com/pterodactyl/wings/pulls/192))
-* Fixes logic to use base2 (1024, *bibyte) when calculating memory limits ([#190](https://github.com/pterodactyl/wings/pulls/190))
-* Fixes hard-links being counted multiple times when calculating disk usage ([#181](https://github.com/pterodactyl/wings/pulls/181))
+* [CVE-2025-68954](https://github.com/realmopensource/panel/security/advisories/GHSA-8c39-xppg-479c)
+* [CVE-2025-69199](https://github.com/realmopensource/panel/security/advisories/GHSA-8w7m-w749-rx98)
+* [CVE-2026-21696](https://github.com/realmopensource/wings/security/advisories/GHSA-2497-gp99-2m74)
+* Fixes folders not being sorted before files when returning list of directory contents ([#5078](https://github.com/realmopensource/panel/issues/5078))
+* User-defined labels not being passed to environment ([#191](https://github.com/realmopensource/wings/pulls/191))
+* Fixes handling of termination signals for containers ([#192](https://github.com/realmopensource/wings/pulls/192))
+* Fixes logic to use base2 (1024, *bibyte) when calculating memory limits ([#190](https://github.com/realmopensource/wings/pulls/190))
+* Fixes hard-links being counted multiple times when calculating disk usage ([#181](https://github.com/realmopensource/wings/pulls/181))
 
 ### Added
-* Support relative file paths for the Wings config ([#180](https://github.com/pterodactyl/wings/pull/180))
-* Support mounting generated `/etc/passwd` files to containers ([#197](https://github.com/pterodactyl/wings/pulls/197))
+* Support relative file paths for the Wings config ([#180](https://github.com/realmopensource/wings/pull/180))
+* Support mounting generated `/etc/passwd` files to containers ([#197](https://github.com/realmopensource/wings/pulls/197))
 
 ## v1.11.13
 ### Fixed
-* Auto-configure not working ([#5087](https://github.com/pterodactyl/panel/issues/5087))
-* Individual files unable to be decompressed ([#5034](https://github.com/pterodactyl/panel/issues/5034))
+* Auto-configure not working ([#5087](https://github.com/realmopensource/panel/issues/5087))
+* Individual files unable to be decompressed ([#5034](https://github.com/realmopensource/panel/issues/5034))
 
 ## v1.11.12
 ### Fixed
-* Arbitrary File Write/Read ([GHSA-gqmf-jqgv-v8fw](https://github.com/pterodactyl/wings/security/advisories/GHSA-gqmf-jqgv-v8fw))
-* Server-side Request Forgery (SSRF) during remote file pull ([GHSA-qq22-jj8x-4wwv](https://github.com/pterodactyl/wings/security/advisories/GHSA-qq22-jj8x-4wwv))
-* Invalid `Content-Type` being used with the `wings diagnostics` command ([#186](https://github.com/pterodactyl/wings/pull/186))
+* Arbitrary File Write/Read ([GHSA-gqmf-jqgv-v8fw](https://github.com/realmopensource/wings/security/advisories/GHSA-gqmf-jqgv-v8fw))
+* Server-side Request Forgery (SSRF) during remote file pull ([GHSA-qq22-jj8x-4wwv](https://github.com/realmopensource/wings/security/advisories/GHSA-qq22-jj8x-4wwv))
+* Invalid `Content-Type` being used with the `wings diagnostics` command ([#186](https://github.com/realmopensource/wings/pull/186))
 
 ## v1.11.11
 ### Fixed
 * Backups missing content when a `.pteroignore` file is used
-* Archives originating from a subdirectory not containing any files ([#5030](https://github.com/pterodactyl/panel/issues/5030))
+* Archives originating from a subdirectory not containing any files ([#5030](https://github.com/realmopensource/panel/issues/5030))
 
 ## v1.11.10
 ### Fixed
-* Archives randomly ignoring files and directories ([#5027](https://github.com/pterodactyl/panel/issues/5027))
-* Crash when deleting or transferring a server ([#5028](https://github.com/pterodactyl/panel/issues/5028))
+* Archives randomly ignoring files and directories ([#5027](https://github.com/realmopensource/panel/issues/5027))
+* Crash when deleting or transferring a server ([#5028](https://github.com/realmopensource/panel/issues/5028))
 
 ## v1.11.9
 ### Changed
@@ -70,13 +70,13 @@
 
 ## v1.11.5
 ### Added
-* Added a config option to disable Wings config.yml updates from the Panel (https://github.com/pterodactyl/wings/commit/ec6d6d83ea3eb14995c24f001233e85b37ffb87b)
+* Added a config option to disable Wings config.yml updates from the Panel (https://github.com/realmopensource/wings/commit/ec6d6d83ea3eb14995c24f001233e85b37ffb87b)
 
 ### Changed
 * Wings is now built with Go 1.19.7
 
 ### Fixed
-* Fixed archives containing partially matched file names (https://github.com/pterodactyl/wings/commit/43b3496f0001cec231c80af1f9a9b3417d04e8d4)
+* Fixed archives containing partially matched file names (https://github.com/realmopensource/wings/commit/43b3496f0001cec231c80af1f9a9b3417d04e8d4)
 
 ## v1.11.4
 ### Fixed

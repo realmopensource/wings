@@ -69,7 +69,7 @@ func (e *Environment) Start(ctx context.Context) error {
 		// to the next block of code here. This check was inlined here to guard against
 		// a nil-pointer when checking c.State below.
 		//
-		// @see https://github.com/pterodactyl/panel/issues/2000
+		// @see https://github.com/realmopensource/panel/issues/2000
 		if !client.IsErrNotFound(err) {
 			return errors.WrapIf(err, "environment/docker: failed to inspect container")
 		}
