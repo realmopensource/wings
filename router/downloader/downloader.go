@@ -188,7 +188,7 @@ func (dl *Download) Execute() error {
 		return errors.WrapIf(err, "downloader: failed to create request")
 	}
 
-	req.Header.Set("User-Agent", "Pterodactyl Panel (https://pterodactyl.io)")
+	req.Header.Set("User-Agent", "Realm Panel (https://realmctl.com)")
 	res, err := client.Do(req)
 	if err != nil {
 		if IsDownloadError(err) {
