@@ -1,0 +1,124 @@
+# Lima VM for running Wings locally on macOS
+# Create:  make lima-create
+# Setup:   make lima-setup
+# Status:  make lima-status
+# Delete:  make lima-delete
+
+minimumLimaVersion: 1.0.0
+
+cpus: 2
+memory: 2GiB
+disk: 20GiB
+
+vmType: vz
+mountType: virtiofs
+
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-arm64.img"
+    arch: aarch64
+
+mounts:
+  - location: "~/Downloads/realmopensource/wings"
+    writable: true
+
+portForwards:
+  - guestPort: 8080
+    hostPort: 8080
+  - guestPort: 2022
+    hostPort: 2022
+
+containerd:
+  system: false
+  user: false
+
+provision:
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -eux -o pipefail
+
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update
+      apt-get upgrade -y
+
+      apt-get install -y \
+        apt-transport-https \
+        ca-certificates \
+        curl \
+        gnupg \
+        lsb-release \
+        jq
+
+      # Docker
+      install -m 0755 -d /etc/apt/keyrings
+      curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      chmod a+r /etc/apt/keyrings/docker.gpg
+      echo \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+        $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+        > /etc/apt/sources.list.d/docker.list
+      apt-get update
+      apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+      systemctl enable --now docker
+
+      # Go 1.24 (required by wings/go.mod)
+      GOLANG_VERSION=1.24.1
+      curl -fsSL "https://go.dev/dl/go${GOLANG_VERSION}.linux-arm64.tar.gz" -o /tmp/go.tar.gz
+      rm -rf /usr/local/go
+      tar -C /usr/local -xzf /tmp/go.tar.gz
+      ln -sf /usr/local/go/bin/go /usr/local/bin/go
+
+      # Pterodactyl directories
+      useradd -m -s /bin/bash -u 988 pterodactyl 2>/dev/null || true
+      usermod -aG docker pterodactyl 2>/dev/null || true
+
+      mkdir -p /etc/pterodactyl
+      mkdir -p /var/lib/pterodactyl/{volumes,archives,backups}
+      mkdir -p /var/log/pterodactyl
+      mkdir -p /tmp/pterodactyl
+      mkdir -p /run/wings
+
+      chown -R pterodactyl:pterodactyl /var/lib/pterodactyl /var/log/pterodactyl
+      chmod -R 755 /var/lib/pterodactyl /var/log/pterodactyl /tmp/pterodactyl /run/wings
+
+      cat > /etc/systemd/system/wings.service <<'UNIT'
+      [Unit]
+      Description=Pterodactyl Wings Daemon
+      After=docker.service network-online.target
+      Wants=network-online.target
+      Requires=docker.service
+
+      [Service]
+      User=root
+      ExecStart=/usr/local/bin/wings --config /etc/pterodactyl/config.yml
+      Restart=on-failure
+      RestartSec=5
+      LimitNOFILE=4096
+
+      [Install]
+      WantedBy=multi-user.target
+      UNIT
+
+      systemctl daemon-reload
+
+probes:
+  - description: "docker must be installed"
+    script: |
+      #!/bin/bash
+      command -v docker >/dev/null
+    hint: "Docker installation failed during provisioning."
+
+message: |
+  Lima Wings VM is ready.
+
+  Build and start Wings:
+    make lima-setup
+
+  Open a shell in the VM:
+    limactl shell wings
+
+  Optional — reach VM IP directly from Mac (not just port-forward):
+    sudo brew services start socket_vmnet
+    Then recreate with "networks: [{lima: shared}]" in lima-wings.yaml
+
+  Check status: make lima-status
