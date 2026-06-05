@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/pterodactyl/wings/router/middleware"
-	"github.com/pterodactyl/wings/server"
+	"github.com/realmopensource/wings/router/middleware"
+	"github.com/realmopensource/wings/server"
 )
 
 // postServerFirewall receives a whitelist payload from the panel and applies

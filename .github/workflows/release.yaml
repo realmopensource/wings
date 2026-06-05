@@ -22,9 +22,9 @@ jobs:
         env:
           CGO_ENABLED: 0
         run: |
-          GOARCH=amd64 go build -o dist/wings_linux_amd64 -v -trimpath -ldflags="-s -w -X github.com/realmopensource/wings/system.Version=${{ github.ref_name }}" github.com/realmopensource/wings
+          GOARCH=amd64 go build -o dist/wings_linux_amd64 -v -trimpath -ldflags="-s -w -X github.com/realmopensource/wings/system.Version=${{ github.ref_name }}" .
           chmod 755 dist/wings_linux_amd64
-          GOARCH=arm64 go build -o dist/wings_linux_arm64 -v -trimpath -ldflags="-s -w -X github.com/realmopensource/wings/system.Version=${{ github.ref_name }}" github.com/realmopensource/wings
+          GOARCH=arm64 go build -o dist/wings_linux_arm64 -v -trimpath -ldflags="-s -w -X github.com/realmopensource/wings/system.Version=${{ github.ref_name }}" .
           chmod 755 dist/wings_linux_arm64
 
       - name: Create release branch

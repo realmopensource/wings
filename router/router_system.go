@@ -8,13 +8,13 @@ import (
 
 	"github.com/apex/log"
 	"github.com/gin-gonic/gin"
-	"github.com/pterodactyl/wings/router/tokens"
+	"github.com/realmopensource/wings/router/tokens"
 
-	"github.com/pterodactyl/wings/config"
-	"github.com/pterodactyl/wings/router/middleware"
-	"github.com/pterodactyl/wings/server"
-	"github.com/pterodactyl/wings/server/installer"
-	"github.com/pterodactyl/wings/system"
+	"github.com/realmopensource/wings/config"
+	"github.com/realmopensource/wings/router/middleware"
+	"github.com/realmopensource/wings/server"
+	"github.com/realmopensource/wings/server/installer"
+	"github.com/realmopensource/wings/system"
 )
 
 // Returns information about the system that wings is running on.

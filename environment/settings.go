@@ -9,7 +9,7 @@ import (
 	"github.com/apex/log"
 	"github.com/docker/docker/api/types/container"
 
-	"github.com/pterodactyl/wings/config"
+	"github.com/realmopensource/wings/config"
 )
 
 type Mount struct {

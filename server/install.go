@@ -18,10 +18,10 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 
-	"github.com/pterodactyl/wings/config"
-	"github.com/pterodactyl/wings/environment"
-	"github.com/pterodactyl/wings/remote"
-	"github.com/pterodactyl/wings/system"
+	"github.com/realmopensource/wings/config"
+	"github.com/realmopensource/wings/environment"
+	"github.com/realmopensource/wings/remote"
+	"github.com/realmopensource/wings/system"
 )
 
 // Install executes the installation stack for a server process. Bubbles any

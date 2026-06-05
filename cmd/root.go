@@ -26,16 +26,16 @@ import (
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 
-	"github.com/pterodactyl/wings/config"
-	"github.com/pterodactyl/wings/environment"
-	"github.com/pterodactyl/wings/internal/cron"
-	"github.com/pterodactyl/wings/internal/database"
-	"github.com/pterodactyl/wings/loggers/cli"
-	"github.com/pterodactyl/wings/remote"
-	"github.com/pterodactyl/wings/router"
-	"github.com/pterodactyl/wings/server"
-	"github.com/pterodactyl/wings/sftp"
-	"github.com/pterodactyl/wings/system"
+	"github.com/realmopensource/wings/config"
+	"github.com/realmopensource/wings/environment"
+	"github.com/realmopensource/wings/internal/cron"
+	"github.com/realmopensource/wings/internal/database"
+	"github.com/realmopensource/wings/loggers/cli"
+	"github.com/realmopensource/wings/remote"
+	"github.com/realmopensource/wings/router"
+	"github.com/realmopensource/wings/server"
+	"github.com/realmopensource/wings/sftp"
+	"github.com/realmopensource/wings/system"
 )
 
 var (
