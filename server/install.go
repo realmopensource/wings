@@ -36,7 +36,8 @@ func (s *Server) Install() error {
 
 func (s *Server) install(reinstall bool) error {
 	var err error
-	if !s.Config().SkipEggScripts {
+	skipScripts := s.Config().SkipEggScripts && !reinstall
+	if !skipScripts {
 		// Send the start event so the Panel can automatically update. We don't
 		// send this unless the process is actually going to run, otherwise all
 		// sorts of weird rapid UI behavior happens since there isn't an actual
