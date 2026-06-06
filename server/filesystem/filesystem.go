@@ -189,7 +189,29 @@ func (fs *Filesystem) Write(p string, r io.Reader, newSize int64, mode ufs.FileM
 // CreateDirectory creates a new directory (name) at a specified path (p) for
 // the server.
 func (fs *Filesystem) CreateDirectory(name string, p string) error {
-	return fs.unixFS.MkdirAll(filepath.Join(p, name), 0o755)
+	dir := filepath.Join(p, name)
+	if err := fs.unixFS.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+
+	// MkdirAll runs with the Wings process credentials (typically root). Without
+	// explicitly chowning the result, directories created via the Panel API end
+	// up owned by root:root while files created through Write() are owned by the
+	// configured system user.
+	cleaned := filepath.Clean(dir)
+	segments := strings.Split(strings.Trim(cleaned, "/"), "/")
+	current := ""
+	for _, segment := range segments {
+		if segment == "" {
+			continue
+		}
+		current = filepath.Join(current, segment)
+		if err := fs.chownFile(current); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (fs *Filesystem) Rename(oldpath, newpath string) error {
