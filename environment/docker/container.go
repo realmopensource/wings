@@ -170,7 +170,7 @@ func (e *Environment) Create() error {
 	for key := range confLabels {
 		labels[key] = confLabels[key]
 	}
-	labels["Service"] = "Pterodactyl"
+	labels["Service"] = "Realm"
 	labels["ContainerType"] = "server_process"
 
 	conf := &container.Config{

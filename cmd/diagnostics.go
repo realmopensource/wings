@@ -95,7 +95,7 @@ func diagnosticsCmdRun(*cobra.Command, []string) {
 	dockerVersion, dockerInfo, dockerErr := getDockerInfo()
 
 	output := &strings.Builder{}
-	fmt.Fprintln(output, "Pterodactyl Wings - Diagnostics Report")
+	fmt.Fprintln(output, "Realm Wings - Diagnostics Report")
 	printHeader(output, "Versions")
 	fmt.Fprintln(output, "               Wings:", system.Version)
 	if dockerErr == nil {
@@ -109,7 +109,7 @@ func diagnosticsCmdRun(*cobra.Command, []string) {
 	}
 
 	printHeader(output, "Wings Configuration")
-	if err := config.FromFile(config.ResolveConfigPath(config.DefaultLocation)); err != nil {
+	if err := config.FromFile(config.DefaultLocation); err != nil {
 	}
 	cfg := config.Get()
 	fmt.Fprintln(output, "      Panel Location:", redact(cfg.PanelLocation))

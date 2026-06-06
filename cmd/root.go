@@ -401,13 +401,6 @@ func initConfig() {
 		configPath = d
 	}
 
-	// Fall back to the legacy Pterodactyl configuration location when the new
-	// default does not exist yet so existing nodes keep booting after upgrading.
-	if resolved := config.ResolveConfigPath(configPath); resolved != configPath {
-		log.WithField("config_file", resolved).Warn("using legacy configuration path; consider migrating to /etc/realm")
-		configPath = resolved
-	}
-
 	err := config.FromFile(configPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

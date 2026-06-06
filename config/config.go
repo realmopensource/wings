@@ -30,29 +30,6 @@ import (
 
 const DefaultLocation = "/etc/realm/config.yml"
 
-// LegacyLocation is the configuration path used by older Pterodactyl-based
-// installations. Wings will fall back to this location when the default Realm
-// path does not exist yet, allowing existing nodes to keep running after an
-// upgrade. See ResolveConfigPath.
-const LegacyLocation = "/etc/pterodactyl/config.yml"
-
-// ResolveConfigPath returns the configuration path that should be used for the
-// given requested path. When the caller did not override the path and the new
-// default does not exist, but a legacy Pterodactyl configuration file is found,
-// the legacy path is returned so existing installations continue to boot.
-func ResolveConfigPath(requested string) string {
-	if requested != DefaultLocation {
-		return requested
-	}
-	if _, err := os.Stat(requested); err == nil {
-		return requested
-	}
-	if _, err := os.Stat(LegacyLocation); err == nil {
-		return LegacyLocation
-	}
-	return requested
-}
-
 // DefaultTLSConfig sets sane defaults to use when configuring the internal
 // webserver to listen for public connections.
 //
