@@ -401,6 +401,8 @@ func initConfig() {
 		configPath = d
 	}
 
+	configPath = config.ResolveConfigPath(configPath)
+
 	err := config.FromFile(configPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

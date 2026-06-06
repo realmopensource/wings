@@ -30,6 +30,24 @@ import (
 
 const DefaultLocation = "/etc/realm/config.yml"
 
+const alternateConfigLocation = "/etc/pterodactyl/config.yml"
+
+// ResolveConfigPath returns the configuration file path to load. When the
+// requested path is the default and that file does not exist, an alternate
+// location is checked so existing installations keep running.
+func ResolveConfigPath(requested string) string {
+	if requested != DefaultLocation {
+		return requested
+	}
+	if _, err := os.Stat(requested); err == nil {
+		return requested
+	}
+	if _, err := os.Stat(alternateConfigLocation); err == nil {
+		return alternateConfigLocation
+	}
+	return requested
+}
+
 // DefaultTLSConfig sets sane defaults to use when configuring the internal
 // webserver to listen for public connections.
 //
