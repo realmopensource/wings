@@ -45,7 +45,7 @@ var (
 
 var rootCommand = &cobra.Command{
 	Use:   "wings",
-	Short: "Runs the API server allowing programmatic control of game servers for Pterodactyl Panel.",
+	Short: "Runs the API server allowing programmatic control of game servers for Realm Panel.",
 	PreRun: func(cmd *cobra.Command, args []string) {
 		initConfig()
 		initLogging()
@@ -63,7 +63,7 @@ var versionCommand = &cobra.Command{
 	Use:   "version",
 	Short: "Prints the current executable version and exits.",
 	Run: func(cmd *cobra.Command, _ []string) {
-		fmt.Printf("wings v%s\nCopyright © 2018 - %d Dane Everitt & Contributors\n", system.Version, time.Now().Year())
+		fmt.Printf("wings v%s\nCopyright © 2026 - %d Realm Open Source & Contributors\n", system.Version, time.Now().Year())
 	},
 }
 
@@ -108,11 +108,11 @@ func rootCmdRun(cmd *cobra.Command, _ []string) {
 	}
 	log.WithField("timezone", config.Get().System.Timezone).Info("configured wings with system timezone")
 	if err := config.ConfigureDirectories(); err != nil {
-		log.WithField("error", err).Fatal("failed to configure system directories for pterodactyl")
+		log.WithField("error", err).Fatal("failed to configure system directories for realm")
 		return
 	}
-	if err := config.EnsurePterodactylUser(); err != nil {
-		log.WithField("error", err).Fatal("failed to create pterodactyl system user")
+	if err := config.EnsureRealmUser(); err != nil {
+		log.WithField("error", err).Fatal("failed to create realm system user")
 		return
 	}
 	if err := config.ConfigurePasswd(); err != nil {
@@ -399,6 +399,13 @@ func initConfig() {
 			log2.Fatalf("cmd/root: failed to get path to config file: %s", err)
 		}
 		configPath = d
+	}
+
+	// Fall back to the legacy Pterodactyl configuration location when the new
+	// default does not exist yet so existing nodes keep booting after upgrading.
+	if resolved := config.ResolveConfigPath(configPath); resolved != configPath {
+		log.WithField("config_file", resolved).Warn("using legacy configuration path; consider migrating to /etc/realm")
+		configPath = resolved
 	}
 
 	err := config.FromFile(configPath)

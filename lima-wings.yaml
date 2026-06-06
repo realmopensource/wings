@@ -68,29 +68,29 @@ provision:
       tar -C /usr/local -xzf /tmp/go.tar.gz
       ln -sf /usr/local/go/bin/go /usr/local/bin/go
 
-      # Pterodactyl directories
-      useradd -m -s /bin/bash -u 988 pterodactyl 2>/dev/null || true
-      usermod -aG docker pterodactyl 2>/dev/null || true
+      # Realm directories
+      useradd -m -s /bin/bash -u 988 realm 2>/dev/null || true
+      usermod -aG docker realm 2>/dev/null || true
 
-      mkdir -p /etc/pterodactyl
-      mkdir -p /var/lib/pterodactyl/{volumes,archives,backups}
-      mkdir -p /var/log/pterodactyl
-      mkdir -p /tmp/pterodactyl
+      mkdir -p /etc/realm
+      mkdir -p /var/lib/realm/{volumes,archives,backups}
+      mkdir -p /var/log/realm
+      mkdir -p /tmp/realm
       mkdir -p /run/wings
 
-      chown -R pterodactyl:pterodactyl /var/lib/pterodactyl /var/log/pterodactyl
-      chmod -R 755 /var/lib/pterodactyl /var/log/pterodactyl /tmp/pterodactyl /run/wings
+      chown -R realm:realm /var/lib/realm /var/log/realm
+      chmod -R 755 /var/lib/realm /var/log/realm /tmp/realm /run/wings
 
       cat > /etc/systemd/system/wings.service <<'UNIT'
       [Unit]
-      Description=Pterodactyl Wings Daemon
+      Description=Realm Wings Daemon
       After=docker.service network-online.target
       Wants=network-online.target
       Requires=docker.service
 
       [Service]
       User=root
-      ExecStart=/usr/local/bin/wings --config /etc/pterodactyl/config.yml
+      ExecStart=/usr/local/bin/wings --config /etc/realm/config.yml
       Restart=on-failure
       RestartSec=5
       LimitNOFILE=4096

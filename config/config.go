@@ -28,7 +28,30 @@ import (
 	"github.com/realmopensource/wings/system"
 )
 
-const DefaultLocation = "/etc/pterodactyl/config.yml"
+const DefaultLocation = "/etc/realm/config.yml"
+
+// LegacyLocation is the configuration path used by older Pterodactyl-based
+// installations. Wings will fall back to this location when the default Realm
+// path does not exist yet, allowing existing nodes to keep running after an
+// upgrade. See ResolveConfigPath.
+const LegacyLocation = "/etc/pterodactyl/config.yml"
+
+// ResolveConfigPath returns the configuration path that should be used for the
+// given requested path. When the caller did not override the path and the new
+// default does not exist, but a legacy Pterodactyl configuration file is found,
+// the legacy path is returned so existing installations continue to boot.
+func ResolveConfigPath(requested string) string {
+	if requested != DefaultLocation {
+		return requested
+	}
+	if _, err := os.Stat(requested); err == nil {
+		return requested
+	}
+	if _, err := os.Stat(LegacyLocation); err == nil {
+		return LegacyLocation
+	}
+	return requested
+}
 
 // DefaultTLSConfig sets sane defaults to use when configuring the internal
 // webserver to listen for public connections.
@@ -123,27 +146,27 @@ type RemoteQueryConfiguration struct {
 
 // SystemConfiguration defines basic system configuration settings.
 type SystemConfiguration struct {
-	// The root directory where all of the pterodactyl data is stored at.
-	RootDirectory string `default:"/var/lib/pterodactyl" json:"-" yaml:"root_directory"`
+	// The root directory where all of the Realm data is stored at.
+	RootDirectory string `default:"/var/lib/realm" json:"-" yaml:"root_directory"`
 
 	// Directory where logs for server installations and other wings events are logged.
-	LogDirectory string `default:"/var/log/pterodactyl" json:"-" yaml:"log_directory"`
+	LogDirectory string `default:"/var/log/realm" json:"-" yaml:"log_directory"`
 
 	// Directory where the server data is stored at.
-	Data string `default:"/var/lib/pterodactyl/volumes" json:"-" yaml:"data"`
+	Data string `default:"/var/lib/realm/volumes" json:"-" yaml:"data"`
 
 	// Directory where server archives for transferring will be stored.
-	ArchiveDirectory string `default:"/var/lib/pterodactyl/archives" json:"-" yaml:"archive_directory"`
+	ArchiveDirectory string `default:"/var/lib/realm/archives" json:"-" yaml:"archive_directory"`
 
 	// Directory where local backups will be stored on the machine.
-	BackupDirectory string `default:"/var/lib/pterodactyl/backups" json:"-" yaml:"backup_directory"`
+	BackupDirectory string `default:"/var/lib/realm/backups" json:"-" yaml:"backup_directory"`
 
-	// TmpDirectory specifies where temporary files for Pterodactyl installation processes
+	// TmpDirectory specifies where temporary files for Realm installation processes
 	// should be created. This supports environments running docker-in-docker.
-	TmpDirectory string `default:"/tmp/pterodactyl" json:"-" yaml:"tmp_directory"`
+	TmpDirectory string `default:"/tmp/realm" json:"-" yaml:"tmp_directory"`
 
 	// The user that should own all of the server files, and be used for containers.
-	Username string `default:"pterodactyl" yaml:"username"`
+	Username string `default:"realm" yaml:"username"`
 
 	// The timezone for this Wings instance. This is detected by Wings automatically if possible,
 	// and falls back to UTC if not able to be detected. If you need to set this manually, that
@@ -330,7 +353,7 @@ type Configuration struct {
 	// if the debug flag is passed through the command line arguments.
 	Debug bool
 
-	AppName string `default:"Pterodactyl" json:"app_name" yaml:"app_name"`
+	AppName string `default:"Realm" json:"app_name" yaml:"app_name"`
 
 	// A unique identifier for this node in the Panel.
 	Uuid string
@@ -477,14 +500,14 @@ func WriteToDisk(c *Configuration) error {
 	return nil
 }
 
-// EnsurePterodactylUser ensures that the Pterodactyl core user exists on the
+// EnsureRealmUser ensures that the Realm core user exists on the
 // system. This user will be the owner of all data in the root data directory
 // and is used as the user within containers. If files are not owned by this
 // user there will be issues with permissions on Docker mount points.
 //
 // This function IS NOT thread safe and should only be called in the main thread
 // when the application is booting.
-func EnsurePterodactylUser() error {
+func EnsureRealmUser() error {
 	sysName, err := getSystemName()
 	if err != nil {
 		return err
@@ -492,7 +515,7 @@ func EnsurePterodactylUser() error {
 
 	// Our way of detecting if wings is running inside of Docker.
 	if sysName == "distroless" {
-		_config.System.Username = system.FirstNotEmpty(os.Getenv("WINGS_USERNAME"), "pterodactyl")
+		_config.System.Username = system.FirstNotEmpty(os.Getenv("WINGS_USERNAME"), "realm")
 		_config.System.User.Uid = system.MustInt(system.FirstNotEmpty(os.Getenv("WINGS_UID"), "988"))
 		_config.System.User.Gid = system.MustInt(system.FirstNotEmpty(os.Getenv("WINGS_GID"), "988"))
 		return nil
@@ -510,7 +533,7 @@ func EnsurePterodactylUser() error {
 		return nil
 	}
 
-	log.WithField("username", _config.System.Username).Info("checking for pterodactyl system user")
+	log.WithField("username", _config.System.Username).Info("checking for realm system user")
 	u, err := user.Lookup(_config.System.Username)
 	// If an error is returned but it isn't the unknown user error just abort
 	// the process entirely. If we did find a user, return it immediately.

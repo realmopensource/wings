@@ -3,7 +3,7 @@
 set -euo pipefail
 
 DOMAIN="${1:-wings.stijn.wtf}"
-WINGS_CONFIG="${WINGS_CONFIG:-/etc/pterodactyl/config.yml}"
+WINGS_CONFIG="${WINGS_CONFIG:-/etc/realm/config.yml}"
 NGINX_SITE="/etc/nginx/sites-available/${DOMAIN}"
 
 if [[ "$(id -u)" -ne 0 ]]; then

@@ -109,7 +109,7 @@ func diagnosticsCmdRun(*cobra.Command, []string) {
 	}
 
 	printHeader(output, "Wings Configuration")
-	if err := config.FromFile(config.DefaultLocation); err != nil {
+	if err := config.FromFile(config.ResolveConfigPath(config.DefaultLocation)); err != nil {
 	}
 	cfg := config.Get()
 	fmt.Fprintln(output, "      Panel Location:", redact(cfg.PanelLocation))
@@ -167,7 +167,7 @@ func diagnosticsCmdRun(*cobra.Command, []string) {
 
 	printHeader(output, "Latest Wings Logs")
 	if diagnosticsArgs.IncludeLogs {
-		p := "/var/log/pterodactyl/wings.log"
+		p := "/var/log/realm/wings.log"
 		if cfg != nil {
 			p = path.Join(cfg.System.LogDirectory, "wings.log")
 		}

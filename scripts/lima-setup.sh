@@ -38,11 +38,11 @@ sudo install -m 755 /tmp/wings /usr/local/bin/wings
 /usr/local/bin/wings version
 
 echo "==> Installing config..."
-sudo mkdir -p /etc/pterodactyl
-sudo cp "\${WINGS_SRC}/config.yml" /etc/pterodactyl/config.yml
+sudo mkdir -p /etc/realm
+sudo cp "\${WINGS_SRC}/config.yml" /etc/realm/config.yml
 
 # Wings must reach the panel on the Mac host via Lima's user-v2 network gateway.
-sudo sed -i "s|^remote:.*|remote: 'http://\${LIMA_HOST_IP}:8000'|" /etc/pterodactyl/config.yml
+sudo sed -i "s|^remote:.*|remote: 'http://\${LIMA_HOST_IP}:8000'|" /etc/realm/config.yml
 
 echo "==> Starting Wings service..."
 sudo systemctl enable wings
@@ -71,8 +71,8 @@ EOF
 echo ""
 echo "==> Verifying API from Mac host..."
 VM_IP=$(limactl shell "$INSTANCE" -- hostname -I | awk '{print $1}')
-TOKEN_ID=$(limactl shell "$INSTANCE" -- awk '/^token_id:/ {print $2}' /etc/pterodactyl/config.yml)
-TOKEN=$(limactl shell "$INSTANCE" -- awk '/^token:/ {print $2}' /etc/pterodactyl/config.yml)
+TOKEN_ID=$(limactl shell "$INSTANCE" -- awk '/^token_id:/ {print $2}' /etc/realm/config.yml)
+TOKEN=$(limactl shell "$INSTANCE" -- awk '/^token:/ {print $2}' /etc/realm/config.yml)
 
 check_api() {
   local url="$1"
