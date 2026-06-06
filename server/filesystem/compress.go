@@ -7,6 +7,7 @@ import (
 	iofs "io/fs"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -92,6 +93,82 @@ func (fs *Filesystem) archiverFileSystem(ctx context.Context, p string) (iofs.FS
 	}
 	_ = f.Close()
 	return nil, archives.NoMatch
+}
+
+// ListArchiveDirectory returns the contents of a directory within an archive file
+// on the server, such as a .jar or .zip.
+func (fs *Filesystem) ListArchiveDirectory(ctx context.Context, archivePath string, directory string) ([]Stat, error) {
+	fsys, err := fs.archiverFileSystem(ctx, archivePath)
+	if err != nil {
+		if errors.Is(err, archives.NoMatch) {
+			return nil, newFilesystemError(ErrCodeUnknownArchive, err)
+		}
+		return nil, err
+	}
+
+	internal := strings.TrimPrefix(filepath.ToSlash(filepath.Clean(directory)), "/")
+	if internal == "." || internal == "" {
+		internal = "."
+	}
+
+	entries, err := iofs.ReadDir(fsys, internal)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]Stat, 0, len(entries))
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+
+		mimetype := "inode/directory"
+		if !info.IsDir() {
+			mimetype = archiveEntryMimetype(info.Name())
+		}
+
+		out = append(out, Stat{
+			FileInfo: info,
+			Mimetype: mimetype,
+		})
+	}
+
+	slices.SortStableFunc(out, func(a, b Stat) int {
+		switch {
+		case a.Name() == b.Name():
+			return 0
+		case a.Name() > b.Name():
+			return 1
+		default:
+			return -1
+		}
+	})
+
+	slices.SortStableFunc(out, func(a, b Stat) int {
+		switch {
+		case a.IsDir() && b.IsDir():
+			return 0
+		case a.IsDir():
+			return -1
+		default:
+			return 1
+		}
+	})
+
+	return out, nil
+}
+
+func archiveEntryMimetype(name string) string {
+	lower := strings.ToLower(name)
+	switch {
+	case strings.HasSuffix(lower, ".jar"):
+		return "application/java-archive"
+	case strings.HasSuffix(lower, ".zip"):
+		return "application/zip"
+	default:
+		return "application/octet-stream"
+	}
 }
 
 // SpaceAvailableForDecompression looks through a given archive and determines

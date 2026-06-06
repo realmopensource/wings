@@ -94,6 +94,7 @@ func Configure(m *wserver.Manager, client remote.Client) *gin.Engine {
 		{
 			files.GET("/contents", getServerFileContents)
 			files.GET("/list-directory", getServerListDirectory)
+			files.GET("/list-archive", getServerListArchiveDirectory)
 			files.PUT("/rename", putServerRenameFiles)
 			files.POST("/copy", postServerCopyFile)
 			files.POST("/write", postServerWriteFile)

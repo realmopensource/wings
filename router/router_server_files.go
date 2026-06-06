@@ -85,6 +85,21 @@ func getServerListDirectory(c *gin.Context) {
 	}
 }
 
+// Returns the contents of a directory within an archive file for a server.
+func getServerListArchiveDirectory(c *gin.Context) {
+	s := ExtractServer(c)
+	file := strings.TrimLeft(c.Query("file"), "/")
+	dir := c.Query("directory")
+	if dir == "" {
+		dir = "/"
+	}
+	if stats, err := s.Filesystem().ListArchiveDirectory(c.Request.Context(), file, dir); err != nil {
+		middleware.CaptureAndAbort(c, err)
+	} else {
+		c.JSON(http.StatusOK, stats)
+	}
+}
+
 type renameFile struct {
 	To   string `json:"to"`
 	From string `json:"from"`
