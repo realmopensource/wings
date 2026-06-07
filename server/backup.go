@@ -33,9 +33,9 @@ func (s *Server) notifyPanelOfBackup(uuid string, ad *backup.ArchiveDetails, suc
 	return nil
 }
 
-// Get all of the ignored files for a server based on its .pteroignore file in the root.
+// Get all of the ignored files for a server based on its .realmignore file in the root.
 func (s *Server) getServerwideIgnoredFiles() (string, error) {
-	f, st, err := s.Filesystem().File(".pteroignore")
+	f, st, err := s.Filesystem().File(".realmignore")
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return "", nil

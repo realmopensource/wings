@@ -30,15 +30,15 @@ import (
 )
 
 const (
-	DefaultHastebinUrl = "https://ptero.co"
-	DefaultLogLines    = 200
+	DefaultPasteUrl = "https://paste.realmctl.com"
+	DefaultLogLines = 200
 )
 
 var diagnosticsArgs struct {
 	IncludeEndpoints   bool
 	IncludeLogs        bool
 	ReviewBeforeUpload bool
-	HastebinURL        string
+	PasteURL           string
 	LogLines           int
 }
 
@@ -53,7 +53,7 @@ func newDiagnosticsCommand() *cobra.Command {
 		Run: diagnosticsCmdRun,
 	}
 
-	command.Flags().StringVar(&diagnosticsArgs.HastebinURL, "hastebin-url", DefaultHastebinUrl, "the url of the hastebin instance to use")
+	command.Flags().StringVar(&diagnosticsArgs.PasteURL, "paste-url", DefaultPasteUrl, "the url of the paste service to use")
 	command.Flags().IntVar(&diagnosticsArgs.LogLines, "log-lines", DefaultLogLines, "the number of log lines to include in the report")
 
 	return command
@@ -79,7 +79,7 @@ func diagnosticsCmdRun(*cobra.Command, []string) {
 		{
 			Name: "ReviewBeforeUpload",
 			Prompt: &survey.Confirm{
-				Message: "Do you want to review the collected data before uploading to " + diagnosticsArgs.HastebinURL + "?",
+				Message: "Do you want to review the collected data before uploading to " + diagnosticsArgs.PasteURL + "?",
 				Help:    "The data, especially the logs, might contain sensitive information, so you should review it. You will be asked again if you want to upload.",
 				Default: true,
 			},
@@ -197,10 +197,10 @@ func diagnosticsCmdRun(*cobra.Command, []string) {
 
 	upload := !diagnosticsArgs.ReviewBeforeUpload
 	if !upload {
-		survey.AskOne(&survey.Confirm{Message: "Upload to " + diagnosticsArgs.HastebinURL + "?", Default: false}, &upload)
+		survey.AskOne(&survey.Confirm{Message: "Upload to " + diagnosticsArgs.PasteURL + "?", Default: false}, &upload)
 	}
 	if upload {
-		u, err := uploadToHastebin(diagnosticsArgs.HastebinURL, output.String())
+		u, err := uploadToPaste(diagnosticsArgs.PasteURL, output.String())
 		if err == nil {
 			fmt.Println("Your report is available here: ", u)
 		}
@@ -223,17 +223,22 @@ func getDockerInfo() (types.Version, dockersystem.Info, error) {
 	return dockerVersion, dockerInfo, nil
 }
 
-func uploadToHastebin(hbUrl, content string) (string, error) {
+func uploadToPaste(pasteUrl, content string) (string, error) {
 	r := strings.NewReader(content)
-	u, err := url.Parse(hbUrl)
+	u, err := url.Parse(pasteUrl)
 	if err != nil {
 		return "", err
 	}
 	u.Path = path.Join(u.Path, "documents")
 	res, err := http.Post(u.String(), "text/plain", r)
-	if err != nil || res.StatusCode < 200 || res.StatusCode >= 300 {
+	if err != nil {
 		fmt.Println("Failed to upload report to ", u.String(), err)
 		return "", err
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		fmt.Println("Failed to upload report to ", u.String(), "status:", res.Status)
+		return "", fmt.Errorf("paste upload failed with status %s", res.Status)
 	}
 	pres := make(map[string]interface{})
 	body, err := io.ReadAll(res.Body)
@@ -243,7 +248,7 @@ func uploadToHastebin(hbUrl, content string) (string, error) {
 	}
 	json.Unmarshal(body, &pres)
 	if key, ok := pres["key"].(string); ok {
-		u, _ := url.Parse(hbUrl)
+		u, _ := url.Parse(pasteUrl)
 		u.Path = path.Join(u.Path, key)
 		return u.String(), nil
 	}
