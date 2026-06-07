@@ -2,6 +2,7 @@
 
 ## v1.12.2
 ### Fixed
+* [GHSA-8r6w-3qq5-4p4r](https://github.com/pterodactyl/panel/security/advisories/GHSA-8r6w-3qq5-4p4r): Wings now rejects panel JWTs that do not include the required `scope` claim for upload, download, backup, websocket, and transfer endpoints.
 * Fixes a bug where `fs.Chmod` would change the symlink target possibly allowing a malicious user to modify files outside their home directory.
 * Improved error handling when downloading files to not log as a 500-level error, preferring a 400-level response.
 * Fixes JWT verification logic to confirm that the token has the required scopes for the target subsystem.
