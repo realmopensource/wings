@@ -129,9 +129,25 @@ func postUpdateConfiguration(c *gin.Context) {
 		return
 	}
 
+	existing := config.Get()
+
 	if err := c.BindJSON(&cfg); err != nil {
 		return
 	}
+
+	// The Panel only sends a subset of the daemon configuration. Preserve system
+	// settings that are managed locally on the node, otherwise JSON unmarshaling
+	// will zero them out when the Panel omits the keys.
+	cfg.System.MachineID = existing.System.MachineID
+	cfg.System.Passwd = existing.System.Passwd
+	cfg.System.RootDirectory = existing.System.RootDirectory
+	cfg.System.LogDirectory = existing.System.LogDirectory
+	cfg.System.ArchiveDirectory = existing.System.ArchiveDirectory
+	cfg.System.BackupDirectory = existing.System.BackupDirectory
+	cfg.System.TmpDirectory = existing.System.TmpDirectory
+	cfg.System.Username = existing.System.Username
+	cfg.System.Timezone = existing.System.Timezone
+	cfg.System.User = existing.System.User
 
 	// Keep the SSL certificates the same since the Panel will send through Lets Encrypt
 	// default locations. However, if we picked a different location manually we don't

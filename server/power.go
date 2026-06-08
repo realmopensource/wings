@@ -214,6 +214,10 @@ func (s *Server) onBeforeStart() error {
 		}
 	}
 
+	if err := s.ensureMachineIDFile(); err != nil {
+		return err
+	}
+
 	s.Log().Info("completed server preflight, starting boot process...")
 	return nil
 }

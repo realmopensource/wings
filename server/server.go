@@ -253,6 +253,24 @@ func (s *Server) ReadLogfile(len int) ([]string, error) {
 	return s.Environment.Readlog(len)
 }
 
+func (s *Server) ensureMachineIDFile() error {
+	cfg := config.Get()
+	if !cfg.System.MachineID.Enable {
+		return nil
+	}
+
+	// Hytale wants a machine-id in order to encrypt tokens for the server. So
+	// write a machine-id file for the server that contains the server's UUID
+	// without any dashes.
+	p := filepath.Join(cfg.System.MachineID.Directory, s.ID())
+	machineID := append(bytes.ReplaceAll([]byte(s.ID()), []byte{'-'}, []byte{}), '\n')
+	if err := os.WriteFile(p, machineID, 0o644); err != nil {
+		return fmt.Errorf("failed to write machine-id (at '%s') for server '%s': %w", p, s.ID(), err)
+	}
+
+	return nil
+}
+
 // Initializes a server instance. This will run through and ensure that the environment
 // for the server is setup, and that all of the necessary files are created.
 func (s *Server) CreateEnvironment() error {
@@ -261,16 +279,8 @@ func (s *Server) CreateEnvironment() error {
 		return err
 	}
 
-	cfg := config.Get()
-	if cfg.System.MachineID.Enable {
-		// Hytale wants a machine-id in order to encrypt tokens for the server. So
-		// write a machine-id file for the server that contains the server's UUID
-		// without any dashes.
-		p := filepath.Join(cfg.System.MachineID.Directory, s.ID())
-		machineID := append(bytes.ReplaceAll([]byte(s.ID()), []byte{'-'}, []byte{}), '\n')
-		if err := os.WriteFile(p, machineID, 0o644); err != nil {
-			return fmt.Errorf("failed to write machine-id (at '%s') for server '%s': %w", p, s.ID(), err)
-		}
+	if err := s.ensureMachineIDFile(); err != nil {
+		return err
 	}
 
 	return s.Environment.Create()
