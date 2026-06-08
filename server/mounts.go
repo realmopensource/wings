@@ -6,8 +6,8 @@ import (
 
 	"github.com/apex/log"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/environment"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/environment"
 )
 
 // To avoid confusion when working with mounts, assume that a server.Mount has not been properly

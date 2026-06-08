@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/system"
 )
 
 // Sftp returns the SFTP connection bag for the server instance. This bag tracks

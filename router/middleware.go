@@ -3,8 +3,8 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/realmopensource/wings/router/middleware"
-	"github.com/realmopensource/wings/server"
+	"github.com/realmctl/wings/router/middleware"
+	"github.com/realmctl/wings/server"
 )
 
 // ExtractServer returns the server instance from the gin context. If there is

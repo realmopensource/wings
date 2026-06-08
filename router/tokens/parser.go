@@ -5,7 +5,7 @@ import (
 
 	"github.com/gbrlsnchs/jwt/v3"
 
-	"github.com/realmopensource/wings/config"
+	"github.com/realmctl/wings/config"
 )
 
 type TokenData interface {

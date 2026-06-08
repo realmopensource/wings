@@ -3,9 +3,9 @@
 set -euo pipefail
 
 INSTANCE="${LIMA_INSTANCE:-wings}"
-WINGS_SRC="${WINGS_SRC:-$HOME/Downloads/realmopensource/wings}"
+WINGS_SRC="${WINGS_SRC:-$HOME/Downloads/realmctl/wings}"
 # Inside Lima the virtiofs mount uses the macOS path, not $HOME
-LIMA_WINGS_SRC="/Users/$(whoami)/Downloads/realmopensource/wings"
+LIMA_WINGS_SRC="/Users/$(whoami)/Downloads/realmctl/wings"
 
 echo "==> Building Wings in Lima instance '${INSTANCE}'..."
 

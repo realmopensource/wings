@@ -9,9 +9,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/internal/models"
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/internal/models"
+	"github.com/realmctl/wings/system"
 )
 
 var (

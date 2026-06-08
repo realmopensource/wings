@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/realmopensource/wings/internal/models"
+	"github.com/realmctl/wings/internal/models"
 
 	"emperror.dev/errors"
 	"github.com/apex/log"
 	"github.com/cenkalti/backoff/v4"
 
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/system"
 )
 
 type Client interface {

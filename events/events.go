@@ -6,7 +6,7 @@ import (
 
 	"emperror.dev/errors"
 
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/system"
 )
 
 // Event represents an Event sent over a Bus.

@@ -8,7 +8,7 @@ import (
 
 	"github.com/apex/log"
 
-	"github.com/realmopensource/wings/parser"
+	"github.com/realmctl/wings/parser"
 )
 
 const (

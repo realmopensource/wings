@@ -26,16 +26,16 @@ import (
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/environment"
-	"github.com/realmopensource/wings/internal/cron"
-	"github.com/realmopensource/wings/internal/database"
-	"github.com/realmopensource/wings/loggers/cli"
-	"github.com/realmopensource/wings/remote"
-	"github.com/realmopensource/wings/router"
-	"github.com/realmopensource/wings/server"
-	"github.com/realmopensource/wings/sftp"
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/environment"
+	"github.com/realmctl/wings/internal/cron"
+	"github.com/realmctl/wings/internal/database"
+	"github.com/realmctl/wings/loggers/cli"
+	"github.com/realmctl/wings/remote"
+	"github.com/realmctl/wings/router"
+	"github.com/realmctl/wings/server"
+	"github.com/realmctl/wings/sftp"
+	"github.com/realmctl/wings/system"
 )
 
 var (
@@ -215,8 +215,8 @@ func rootCmdRun(cmd *cobra.Command, _ []string) {
 			// machine is rebooted. It is much better for us to just have a single failed
 			// server instance than an entire offline node.
 			//
-			// @see https://github.com/realmopensource/panel/issues/2475
-			// @see https://github.com/realmopensource/panel/issues/3358
+			// @see https://github.com/realmctl/panel/issues/2475
+			// @see https://github.com/realmctl/panel/issues/3358
 			ctx, cancel := context.WithTimeout(cmd.Context(), time.Second*30)
 			defer cancel()
 
@@ -448,8 +448,8 @@ __ [blue][bold]    Realm  [reset] _____/___/_______ _______ ______
 Copyright © 2026 - %d Realm Open Source & Contributors
 
 Website:  https://realmctl.com
- Source:  https://github.com/realmopensource/wings
-License:  https://github.com/realmopensource/wings/blob/develop/LICENSE
+ Source:  https://github.com/realmctl/wings
+License:  https://github.com/realmctl/wings/blob/develop/LICENSE
 
 This software is made available under the terms of the MIT license.
 The above copyright notice and this permission notice shall be included

@@ -1,4 +1,4 @@
-module github.com/realmopensource/wings
+module github.com/realmctl/wings
 
 go 1.24.0
 

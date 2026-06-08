@@ -4,8 +4,8 @@ import (
 	"emperror.dev/errors"
 	"github.com/apex/log"
 
-	"github.com/realmopensource/wings/internal/database"
-	"github.com/realmopensource/wings/internal/models"
+	"github.com/realmctl/wings/internal/database"
+	"github.com/realmctl/wings/internal/models"
 )
 
 type eventHandler struct {

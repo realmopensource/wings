@@ -9,9 +9,9 @@ import (
 	"github.com/apex/log"
 	"github.com/gin-gonic/gin"
 
-	"github.com/realmopensource/wings/router/middleware"
-	"github.com/realmopensource/wings/server"
-	"github.com/realmopensource/wings/server/backup"
+	"github.com/realmctl/wings/router/middleware"
+	"github.com/realmctl/wings/server"
+	"github.com/realmctl/wings/server/backup"
 )
 
 // postServerBackup performs a backup against a given server instance using the

@@ -10,9 +10,9 @@ import (
 	"github.com/apex/log"
 	"github.com/docker/docker/client"
 
-	"github.com/realmopensource/wings/environment"
-	"github.com/realmopensource/wings/remote"
-	"github.com/realmopensource/wings/server/backup"
+	"github.com/realmctl/wings/environment"
+	"github.com/realmctl/wings/remote"
+	"github.com/realmctl/wings/server/backup"
 )
 
 // Notifies the panel of a backup's state and returns an error if one is encountered

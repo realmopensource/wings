@@ -11,9 +11,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/remote"
-	"github.com/realmopensource/wings/server"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/remote"
+	"github.com/realmctl/wings/server"
 )
 
 // AttachRequestID attaches a unique ID to the incoming HTTP request so that any

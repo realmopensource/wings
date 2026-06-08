@@ -25,7 +25,7 @@ import (
 	"golang.org/x/sys/unix"
 	"gopkg.in/yaml.v2"
 
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/system"
 )
 
 const DefaultLocation = "/etc/realm/config.yml"

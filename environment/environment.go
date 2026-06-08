@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/realmopensource/wings/events"
+	"github.com/realmctl/wings/events"
 )
 
 const (

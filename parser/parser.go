@@ -17,8 +17,8 @@ import (
 	"gopkg.in/ini.v1"
 	"gopkg.in/yaml.v3"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/internal/ufs"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/internal/ufs"
 )
 
 // The file parsing options that are available for a server configuration file.
@@ -531,8 +531,8 @@ func (f *ConfigurationFile) parseTextFile(file ufs.File) error {
 // the value was escaped or not to begin with before setting it, which I suppose
 // can work but jesus that is going to be some annoyingly complicated logic?
 //
-// @see https://github.com/realmopensource/panel/issues/2308 (original)
-// @see https://github.com/realmopensource/panel/issues/3009 ("bug" introduced as result)
+// @see https://github.com/realmctl/panel/issues/2308 (original)
+// @see https://github.com/realmctl/panel/issues/3009 ("bug" introduced as result)
 func (f *ConfigurationFile) parsePropertiesFile(file ufs.File) error {
 	b, err := io.ReadAll(file)
 	if err != nil {

@@ -16,9 +16,9 @@ import (
 	"github.com/klauspost/pgzip"
 	ignore "github.com/sabhiram/go-gitignore"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/internal/progress"
-	"github.com/realmopensource/wings/internal/ufs"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/internal/progress"
+	"github.com/realmctl/wings/internal/ufs"
 )
 
 const memory = 4 * 1024
@@ -212,7 +212,7 @@ func (a *Archive) callback(opts ...walkFunc) walkFunc {
 		// If base isn't empty, strip it from the relative path. This fixes an
 		// issue when creating an archive starting from a nested directory.
 		//
-		// See https://github.com/realmopensource/panel/issues/5030 for more details.
+		// See https://github.com/realmctl/panel/issues/5030 for more details.
 		if base != "" {
 			relative = strings.TrimPrefix(relative, base)
 		}

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/realmopensource/wings/internal/progress"
-	"github.com/realmopensource/wings/server/filesystem"
+	"github.com/realmctl/wings/internal/progress"
+	"github.com/realmctl/wings/server/filesystem"
 )
 
 // Archive returns an archive that can be used to stream the contents of the

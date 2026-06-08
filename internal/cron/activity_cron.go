@@ -6,10 +6,10 @@ import (
 
 	"emperror.dev/errors"
 
-	"github.com/realmopensource/wings/internal/database"
-	"github.com/realmopensource/wings/internal/models"
-	"github.com/realmopensource/wings/server"
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/internal/database"
+	"github.com/realmctl/wings/internal/models"
+	"github.com/realmctl/wings/server"
+	"github.com/realmctl/wings/system"
 )
 
 type activityCron struct {

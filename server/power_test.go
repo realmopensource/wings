@@ -5,7 +5,7 @@ import (
 
 	. "github.com/franela/goblin"
 
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/system"
 )
 
 func TestPower(t *testing.T) {

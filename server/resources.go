@@ -4,8 +4,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/realmopensource/wings/environment"
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/environment"
+	"github.com/realmctl/wings/system"
 )
 
 // ResourceUsage defines the current resource usage for a given server instance. If a server is offline you

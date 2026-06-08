@@ -11,8 +11,8 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 
-	"github.com/realmopensource/wings/environment"
-	"github.com/realmopensource/wings/remote"
+	"github.com/realmctl/wings/environment"
+	"github.com/realmctl/wings/remote"
 )
 
 // OnBeforeStart run before the container starts and get the process
@@ -69,7 +69,7 @@ func (e *Environment) Start(ctx context.Context) error {
 		// to the next block of code here. This check was inlined here to guard against
 		// a nil-pointer when checking c.State below.
 		//
-		// @see https://github.com/realmopensource/panel/issues/2000
+		// @see https://github.com/realmctl/panel/issues/2000
 		if !client.IsErrNotFound(err) {
 			return errors.WrapIf(err, "environment/docker: failed to inspect container")
 		}

@@ -11,10 +11,10 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 
-	"github.com/realmopensource/wings/environment"
-	"github.com/realmopensource/wings/events"
-	"github.com/realmopensource/wings/remote"
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/environment"
+	"github.com/realmctl/wings/events"
+	"github.com/realmctl/wings/remote"
+	"github.com/realmctl/wings/system"
 )
 
 type Metadata struct {
@@ -157,7 +157,7 @@ func (e *Environment) ExitState() (uint32, bool, error) {
 		// so I guess this should prevent it? They didn't tell me how they caused it though
 		// so that's a mystery that will have to go unsolved.
 		//
-		// @see https://github.com/realmopensource/panel/issues/2003
+		// @see https://github.com/realmctl/panel/issues/2003
 		if client.IsErrNotFound(err) {
 			return 1, false, nil
 		}

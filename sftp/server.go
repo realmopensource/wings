@@ -19,9 +19,9 @@ import (
 	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/remote"
-	"github.com/realmopensource/wings/server"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/remote"
+	"github.com/realmctl/wings/server"
 )
 
 // Usernames all follow the same format, so don't even bother hitting the API if the username is not

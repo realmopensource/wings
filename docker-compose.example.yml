@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   wings:
-    image: ghcr.io/realmopensource/wings:latest
+    image: ghcr.io/realmctl/wings:latest
     restart: always
     networks:
       - wings0

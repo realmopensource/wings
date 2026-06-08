@@ -8,13 +8,13 @@ import (
 
 	"github.com/apex/log"
 	"github.com/gin-gonic/gin"
-	"github.com/realmopensource/wings/router/tokens"
+	"github.com/realmctl/wings/router/tokens"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/router/middleware"
-	"github.com/realmopensource/wings/server"
-	"github.com/realmopensource/wings/server/installer"
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/router/middleware"
+	"github.com/realmctl/wings/server"
+	"github.com/realmctl/wings/server/installer"
+	"github.com/realmctl/wings/system"
 )
 
 // Returns information about the system that wings is running on.

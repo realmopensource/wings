@@ -8,10 +8,10 @@ import (
 
 	"emperror.dev/errors"
 
-	"github.com/realmopensource/wings/events"
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/events"
+	"github.com/realmctl/wings/system"
 
-	"github.com/realmopensource/wings/server"
+	"github.com/realmctl/wings/server"
 )
 
 // RegisterListenerEvents will setup the server event listeners and expiration
@@ -23,7 +23,7 @@ import (
 // Docker events being output to the socket will fail when it hasn't been
 // properly initialized yet.
 //
-// @see https://github.com/realmopensource/panel/issues/3295
+// @see https://github.com/realmctl/panel/issues/3295
 func (h *Handler) registerListenerEvents(ctx context.Context) {
 	h.Logger().Debug("registering event listeners for connection")
 

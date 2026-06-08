@@ -3,9 +3,9 @@ package server
 import (
 	"time"
 
-	"github.com/realmopensource/wings/environment/docker"
+	"github.com/realmctl/wings/environment/docker"
 
-	"github.com/realmopensource/wings/environment"
+	"github.com/realmctl/wings/environment"
 )
 
 // SyncWithEnvironment updates the environment for the server to match any of
@@ -42,7 +42,7 @@ func (s *Server) SyncWithEnvironment() {
 	// If build limits are changed, environment variables also change. Plus, any modifications to
 	// the startup command also need to be properly propagated to this environment.
 	//
-	// @see https://github.com/realmopensource/panel/issues/2255
+	// @see https://github.com/realmctl/panel/issues/2255
 	s.Environment.Config().SetEnvironmentVariables(s.GetEnvironmentVariables())
 
 	if !s.IsSuspended() {

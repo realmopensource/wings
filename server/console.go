@@ -7,8 +7,8 @@ import (
 
 	"github.com/mitchellh/colorstring"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/system"
 )
 
 // appName is a local cache variable to avoid having to make expensive copies of

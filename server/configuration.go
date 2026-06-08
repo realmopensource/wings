@@ -3,7 +3,7 @@ package server
 import (
 	"sync"
 
-	"github.com/realmopensource/wings/environment"
+	"github.com/realmctl/wings/environment"
 )
 
 type EggConfiguration struct {

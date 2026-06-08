@@ -6,7 +6,7 @@ import (
 
 	"github.com/docker/go-connections/nat"
 
-	"github.com/realmopensource/wings/config"
+	"github.com/realmctl/wings/config"
 )
 
 // Defines the allocations available for a given server. When using the Docker environment

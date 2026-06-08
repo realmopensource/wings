@@ -18,9 +18,9 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/environment"
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/environment"
+	"github.com/realmctl/wings/system"
 )
 
 var ErrNotAttached = errors.Sentinel("not attached to instance")
@@ -283,7 +283,7 @@ func (e *Environment) Destroy() error {
 	// Don't trigger a destroy failure if we try to delete a container that does not
 	// exist on the system. We're just a step ahead of ourselves in that case.
 	//
-	// @see https://github.com/realmopensource/panel/issues/2001
+	// @see https://github.com/realmctl/panel/issues/2001
 	if err != nil && client.IsErrNotFound(err) {
 		return nil
 	}

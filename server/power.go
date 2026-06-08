@@ -8,8 +8,8 @@ import (
 	"emperror.dev/errors"
 	"github.com/google/uuid"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/environment"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/environment"
 )
 
 type PowerAction string

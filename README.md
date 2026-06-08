@@ -1,8 +1,8 @@
 [![Logo Image](https://cdn.ordnary.com/readme.png)](https://realmctl.com)
 
 ![Discord](https://img.shields.io/discord/1509949313982267572?label=Discord&logo=Discord&logoColor=white)
-![GitHub Releases](https://img.shields.io/github/downloads/realmopensource/wings/latest/total)
-[![Go Report Card](https://goreportcard.com/badge/github.com/realmopensource/wings)](https://goreportcard.com/report/github.com/realmopensource/wings)
+![GitHub Releases](https://img.shields.io/github/downloads/realmctl/wings/latest/total)
+[![Go Report Card](https://goreportcard.com/badge/github.com/realmctl/wings)](https://goreportcard.com/report/github.com/realmctl/wings)
 
 # Realm Wings
 
@@ -18,10 +18,10 @@ dependencies, and allowing users to authenticate with the same credentials they 
 * [Panel Documentation](https://realmctl.com/panel/1.0/getting_started.html)
 * [Wings Documentation](https://realmctl.com/wings/1.0/installing.html)
 * [Community Guides](https://realmctl.com/community/about.html)
-* Or, get additional help [via Discord](https://discord.gg/realmopensource)
+* Or, get additional help [via Discord](https://discord.gg/realmctl)
 
 ## Reporting Issues
 
-Please use the [realmopensource/panel](https://github.com/realmopensource/panel) repository to report any issues or make
-feature requests for Wings. In addition, the [security policy](https://github.com/realmopensource/panel/security/policy) listed
+Please use the [realmctl/panel](https://github.com/realmctl/panel) repository to report any issues or make
+feature requests for Wings. In addition, the [security policy](https://github.com/realmctl/panel/security/policy) listed
 within that repository also applies to Wings.

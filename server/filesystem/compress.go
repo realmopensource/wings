@@ -16,8 +16,8 @@ import (
 	"github.com/klauspost/compress/zip"
 	"github.com/mholt/archives"
 
-	"github.com/realmopensource/wings/internal/ufs"
-	"github.com/realmopensource/wings/server/filesystem/archiverext"
+	"github.com/realmctl/wings/internal/ufs"
+	"github.com/realmctl/wings/server/filesystem/archiverext"
 )
 
 // CompressFiles compresses all the files matching the given paths in the

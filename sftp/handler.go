@@ -12,9 +12,9 @@ import (
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/server"
-	"github.com/realmopensource/wings/server/filesystem"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/server"
+	"github.com/realmctl/wings/server/filesystem"
 )
 
 const (

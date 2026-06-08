@@ -6,8 +6,8 @@ import (
 
 	"emperror.dev/errors"
 
-	"github.com/realmopensource/wings/internal/database"
-	"github.com/realmopensource/wings/internal/models"
+	"github.com/realmctl/wings/internal/database"
+	"github.com/realmctl/wings/internal/models"
 )
 
 const ActivityPowerPrefix = "server:power."

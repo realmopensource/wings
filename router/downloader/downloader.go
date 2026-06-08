@@ -17,7 +17,7 @@ import (
 	"emperror.dev/errors"
 	"github.com/google/uuid"
 
-	"github.com/realmopensource/wings/server"
+	"github.com/realmctl/wings/server"
 )
 
 var client *http.Client

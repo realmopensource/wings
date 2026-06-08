@@ -10,7 +10,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 
-	"github.com/realmopensource/wings/config"
+	"github.com/realmctl/wings/config"
 )
 
 var (

@@ -9,11 +9,11 @@ import (
 	"emperror.dev/errors"
 	"github.com/gin-gonic/gin"
 
-	"github.com/realmopensource/wings/environment"
-	"github.com/realmopensource/wings/router/middleware"
-	"github.com/realmopensource/wings/server"
-	"github.com/realmopensource/wings/server/installer"
-	"github.com/realmopensource/wings/server/transfer"
+	"github.com/realmctl/wings/environment"
+	"github.com/realmctl/wings/router/middleware"
+	"github.com/realmctl/wings/server"
+	"github.com/realmctl/wings/server/installer"
+	"github.com/realmctl/wings/server/transfer"
 )
 
 // Data passed over to initiate a server transfer.

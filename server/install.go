@@ -18,10 +18,10 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/environment"
-	"github.com/realmopensource/wings/remote"
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/environment"
+	"github.com/realmctl/wings/remote"
+	"github.com/realmctl/wings/system"
 )
 
 // Install executes the installation stack for a server process. Bubbles any

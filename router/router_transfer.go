@@ -18,11 +18,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/realmopensource/wings/router/middleware"
-	"github.com/realmopensource/wings/router/tokens"
-	"github.com/realmopensource/wings/server"
-	"github.com/realmopensource/wings/server/installer"
-	"github.com/realmopensource/wings/server/transfer"
+	"github.com/realmctl/wings/router/middleware"
+	"github.com/realmctl/wings/router/tokens"
+	"github.com/realmctl/wings/server"
+	"github.com/realmctl/wings/server/installer"
+	"github.com/realmctl/wings/server/transfer"
 )
 
 // postTransfers .

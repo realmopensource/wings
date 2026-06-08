@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/realmopensource/wings/internal/models"
+	"github.com/realmctl/wings/internal/models"
 
 	"emperror.dev/errors"
 	"github.com/apex/log"

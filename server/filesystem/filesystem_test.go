@@ -12,9 +12,9 @@ import (
 
 	. "github.com/franela/goblin"
 
-	"github.com/realmopensource/wings/internal/ufs"
+	"github.com/realmctl/wings/internal/ufs"
 
-	"github.com/realmopensource/wings/config"
+	"github.com/realmctl/wings/config"
 )
 
 func NewFs() (*Filesystem, *rootFs) {

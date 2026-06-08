@@ -8,7 +8,7 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 
-	"github.com/realmopensource/wings/internal/ufs"
+	"github.com/realmctl/wings/internal/ufs"
 )
 
 type Stat struct {

@@ -1,8 +1,8 @@
 package server
 
 import (
-	"github.com/realmopensource/wings/events"
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/events"
+	"github.com/realmctl/wings/system"
 )
 
 // Defines all the possible output events for a server.

@@ -14,9 +14,9 @@ import (
 	"github.com/mholt/archives"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/remote"
-	"github.com/realmopensource/wings/server/filesystem"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/remote"
+	"github.com/realmctl/wings/server/filesystem"
 )
 
 var format = archives.CompressedArchive{

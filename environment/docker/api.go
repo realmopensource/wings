@@ -15,7 +15,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
 
-	"github.com/realmopensource/wings/config"
+	"github.com/realmctl/wings/config"
 )
 
 var (

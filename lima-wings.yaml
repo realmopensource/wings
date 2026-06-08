@@ -18,7 +18,7 @@ images:
     arch: aarch64
 
 mounts:
-  - location: "~/Downloads/realmopensource/wings"
+  - location: "~/Downloads/realmctl/wings"
     writable: true
 
 portForwards:

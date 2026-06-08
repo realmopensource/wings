@@ -9,11 +9,11 @@ import (
 
 	"github.com/apex/log"
 
-	"github.com/realmopensource/wings/events"
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/events"
+	"github.com/realmctl/wings/system"
 
-	"github.com/realmopensource/wings/environment"
-	"github.com/realmopensource/wings/remote"
+	"github.com/realmctl/wings/environment"
+	"github.com/realmctl/wings/remote"
 )
 
 var dockerEvents = []string{

@@ -5,7 +5,7 @@ import (
 
 	"github.com/gammazero/workerpool"
 
-	"github.com/realmopensource/wings/internal/ufs"
+	"github.com/realmctl/wings/internal/ufs"
 )
 
 // UpdateConfigurationFiles updates all the defined configuration files for

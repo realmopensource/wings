@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/realmopensource/wings/cmd"
+	"github.com/realmctl/wings/cmd"
 )
 
 func main() {

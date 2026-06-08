@@ -8,9 +8,9 @@ import (
 	"github.com/apex/log"
 	"github.com/go-co-op/gocron"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/server"
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/server"
+	"github.com/realmctl/wings/system"
 )
 
 const ErrCronRunning = errors.Sentinel("cron: job already running")

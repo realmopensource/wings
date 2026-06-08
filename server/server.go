@@ -15,12 +15,12 @@ import (
 	"github.com/apex/log"
 	"github.com/creasty/defaults"
 
-	"github.com/realmopensource/wings/config"
-	"github.com/realmopensource/wings/environment"
-	"github.com/realmopensource/wings/events"
-	"github.com/realmopensource/wings/remote"
-	"github.com/realmopensource/wings/server/filesystem"
-	"github.com/realmopensource/wings/system"
+	"github.com/realmctl/wings/config"
+	"github.com/realmctl/wings/environment"
+	"github.com/realmctl/wings/events"
+	"github.com/realmctl/wings/remote"
+	"github.com/realmctl/wings/server/filesystem"
+	"github.com/realmctl/wings/system"
 )
 
 // Server is the high level definition for a server instance being controlled
